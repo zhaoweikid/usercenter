@@ -20,43 +20,42 @@ CREATE TABLE IF NOT EXISTS users (
 	extend varchar(8192),
 	key (username, email, mobile)
 );
-insert into users(id,username,password,ctime,status) values (1,'admin','usercenter+admin',now(),2);
+insert into users(id,username,password,ctime,status) values (1,'admin','usercenter+admin',UNIX_TIMESTAMP(now()),2);
 
 -- 权限表
-CREATE TABLE IF NOT EXISTS power (
-	id int(11) not null primary key auto_increment,
+CREATE TABLE IF NOT EXISTS perm (
+	id bigint(20) not null primary key,
     name varchar(128) not null unique,
     memo varchar(128)  
 );
-insert into power(id,name,memo) values (1,'sysadmin','系统管理');
-insert into power(id,name,memo) values (1,'default','普通用户');
+insert into perm(id,name,memo) values (1,'sysadmin','系统管理');
+insert into perm(id,name,memo) values (1,'default','普通用户');
 
 -- 组
 CREATE TABLE IF NOT EXISTS groups (
-	id int(11) not null primary key auto_increment,
+	id bigint(20) not null primary key,
 	name varchar(128) not null unique,
-	ownerid int(11) not null, -- 拥有人
-	power varchar(4096) not null, -- 组权限
-	ctime datetime,
-	uptime datetime,
-	key (name)
+	userid bigint(20) not null, -- 拥有人
+	perm varchar(4096) not null, -- 组权限
+	ctime unsigned int(11),
+	uptime unsigned int(11)
 ); 
-insert into groups(id,name,ownerid,power,ctime,uptime) values (1,'admin',1,1,now(),now());
+insert into groups(id,name,ownerid,perm,ctime,uptime) values (1,'admin',1,1,UNIX_TIMESTAMP(now()),UNIX_TIMESTAMP(now()));
 
--- 用户组关系
+-- 用户组关系 user<=>group
 CREATE TABLE IF NOT EXISTS usergroup (
-	id int(11) not null primary key auto_increment,
-	userid int(11) not null,
-	groupid int(11) not null,
-	ctime datetime
+	id bigint(20) not null primary key,
+	userid bigint(20) not null,
+	groupid bigint(20) not null,
+	ctime unsigned int
 );
-insert into usergroup(id,userid,groupid,ctime) values (1,1,1,now());
+insert into usergroup(id,userid,groupid,ctime) values (1,1,1,UNIX_TIMESTAMP(now()));
 
 -- 用户日志
 CREATE TABLE IF NOT EXISTS userlog (
-	id int(11) not null primary key auto_increment,
-	userid int(11) not null,
-	opuserid int(11) not null, -- 执行动作的用户
+	id bigint(20) not null primary key,
+	userid bigint(20) not null,
+	opuserid bigint(20) not null, -- 执行动作的用户
 	action varchar(32) not null, -- login,logout,reg,modify,...
 	content varchar(4096),
 	ctime datetime
@@ -64,9 +63,11 @@ CREATE TABLE IF NOT EXISTS userlog (
 
 -- 基本设置
 CREATE TABLE IF NOT EXISTS setting (
-	id int(11) not null primary key auto_increment,
-	user_new_status tinyint not null default 2
+	id bigint(20) not null primary key,
+	userid bigint(20) not null,
+	name varchar(128) not null primary key,
+	value varchar(512) not null,
+	key (userid)
 );
-insert into setting set user_new_status=2;
 
 
