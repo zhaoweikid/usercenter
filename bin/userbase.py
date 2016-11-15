@@ -2,8 +2,9 @@
 import os, sys
 import random, hashlib
 from zbase.web import core
-import session2
+from zbase.web import session2
 import config
+import json
 import logging
 
 log = logging.getLogger()
@@ -21,18 +22,28 @@ def get_session(classname):
     return getattr(session2, classname)
 
 
-class BaseHander (core.Handler):
+def check_login(f):
+    def _(f, *args, **kwargs):
+        if not f.ses or not f.ses['uid']:
+            return f.fail('please login')
+        f(*args, **kwargs)
+    return _
+
+
+class BaseHandler (core.Handler):
     def initial(self):
         self.set_headers({'Content-Type': 'application/json; charset=UTF-8'})
         self.ses = None
         sid = self.get_cookie('sid')
+        log.info('sid:%s', sid)
         if sid: 
             sescls = get_session(config['SESSION']['type'])
             self.ses = sescls(config['SESSION']['server'], sid=sid,
                     expire=config['SESSION']['expire'])
 
+        #if not sid and self.req.path != '/v1/user/register':
+        #    return self.fail('please login first')
 
-    
     def finish(self):
         if self.ses and self.ses.sid:
             self.ses.save()
@@ -41,6 +52,7 @@ class BaseHander (core.Handler):
     def create_sesson(self):
         sescls = get_session(config['SESSION']['type'])
         self.ses = sescls(config['SESSION']['server'], expire=config['SESSION']['expire'])
+        return self.ses
 
     def succ(self, data=None):
         obj = {'ret':OK}
@@ -51,7 +63,7 @@ class BaseHander (core.Handler):
         self.write(s)
 
     def fail(self, errstr=u'internal error'):
-        obj = {'ret':ERR, 'error':errstr}
+        obj = {'ret':ERR, 'err':errstr}
         s = json.dumps(obj, separators=(',', ':'))
         log.info('failed: %s', s)
         self.write(s)

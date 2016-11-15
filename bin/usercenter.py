@@ -2,8 +2,9 @@
 import os, sys
 import json, random, hashlib
 from zbase.web import core 
+from zbase.web.validator2 import *
 import logging
-from userbase import BaseHandler
+from userbase import BaseHandler, check_login
 #import pdb
 #pdb.set_trace()
 
@@ -18,9 +19,7 @@ class UserBase (BaseHandler):
     table  = 'users'
     dbname = 'usercenter'
     
-    @with_validator([Field(name='password',match=TypeAscStr), 
-                     Field(name='username',match=TypeStr),
-            ])
+    @with_validator(['username', 'password'])
     def login(self):
         data = self.validtor.data
     
@@ -32,17 +31,19 @@ class UserBase (BaseHandler):
             if not password:
                 return self.fail('password must not null')
 
-            login_key = 'username'
+            login_key = 'email'
             if re.match(TYPE_MAP[T_MAIL]):
                 login_key = 'email'
             elif re.match(TYPE_MAP[T_MOBILE]):
-                login_key = 'mobile' 
+                login_key = 'mobile'
+            else:
+                return self.fail('login key error, must email/mobile')
 
             with get_connection(self.dbname) as conn:
                 where = {
                     login_key: username
                 }
-                ret = conn.select_one(self.table, where, "id,username,email,password")
+                ret = conn.select_one(self.table, where, "id,username,email,password,isadmin")
                 if not ret:
                     return self.fail(login_key + ' not found')
 
@@ -50,12 +51,9 @@ class UserBase (BaseHandler):
             pass_enc = userbase.create_password(password, px[1])
             if ret['password'] != pass_enc:
                 return self.fail('password error')
-                    
-            self.create_session()
-            self.ses['uid']      = ret['id']
-            self.ses['username'] = ret['username']
-            self.ses['email']    = ret['email']
-
+           
+            sesdata = {'uid':ret['id'], 'username':ret['username'], 'isadmin':ret['isadmin']}
+            self.create_user_session(sesdata)
             resp = self.succ({'uid':ret['id']})
             return resp
         except Exception, e:
@@ -63,16 +61,10 @@ class UserBase (BaseHandler):
             return self.fail('Exception:' + str(e))
 
 
-    @session.check_login
-    def logout(self):
-        self.ses.delete() 
-        return self.succ()
 
-
-    @with_validator([Field(name='password',match=T_STR), 
-                     Field(name='username',match=T_STR),
-                     Field(name='email',match=T_EMAIL),
-                     Field(name='mobile',match=T_MOBILE),
+    @with_validator(['username', 'password', 
+                     F('email', T_MAIL),
+                     F('mobile', T_MOBILE),
             ])
     def register(self):
         log.info('register')
@@ -98,98 +90,108 @@ class UserBase (BaseHandler):
                 'username': username,
                 'email': email,
                 'mobile': mobile,
-                'password': password,
+                'password': pass_enc,
             }
 
             with get_connection(self.dbname) as conn:
                 ret = conn.select(self.table, where, 'id')
                 if len(ret) >= 1:
-                    return self.failed('username or email or mobile exist')
+                    return self.fail('username or email or mobile exist')
                 conn.insert(self.table, insertdata)
-            lastid = conn.last_insert_id()
+                lastid = conn.last_insert_id()
             
-            ses = session.create_session()
-            ses['uid'] = lastid
-            ses['username'] = data.getv('username', '')
-            ses['email']    = email
-
-            resp = self.succ(ses)
+            self.create_user_session({'uid':lastid, 'username':username, 'isadmin':0})
+            resp = self.succ({'uid':lastid})
             return resp
         except Exception, e:
             log.error(traceback.format_exc())
-            return self.failed('error:' + str(e))
+            return self.fail('error:' + str(e))
 
+    def create_user_session(self, data):
+        self.create_session()
+        self.ses.update(data)
+    
+    @check_login
+    def get_user(self):
+        uid = self.ses['uid']
+        where = {'id':uid}
+        user = None
+        with get_connection(self.dbname) as conn:
+            user = conn.select_one(self.table, where)
+            if not user:
+                return self.fail('not have user info')
+        for k in ['password', 'regip', 'isadmin']:
+            user.pop(k)
+        if user['extend']:
+            user['extend'] = json.loads(user['extend'])
 
-class UserLogin (UserBase):
-    def get(self):
-        try:
-            self.login()
-        except Exception, e:
-            self.failed()
+        return self.succ(user)
 
+    @check_login
+    def get_user_list(self):
+        if not self.ses.get('isadmin', 0):
+            return self.fail('permission deny')
 
-class UserLogout (UserBase):
-    def get(self):
-        try:
-            self.logout()
-        except Exception, e:
-            self.failed()
+        page = None
+        with get_connection(self.dbname) as conn:
+            page = conn.select_page(self.table, sql, pagecur=pagecur, pagesize=pagesize)
+        pagedata = {
+            'cur':page.page, 
+            'size':page.pagesize, 
+            'count':page.count, 
+            'data':page.pagedata,
+        }
+        return self.succ(pagedata)
 
+    @check_login
+    @with_validator(['username', 'password', 'extend',
+                     F('id', T_INT),
+                     F('status', T_INT),
+    ]) 
+    def modify_user(self):
+        # modify username/status/password/extend
+        data = self.validtor.data
+        values = {}
+        where  = {}
+        if self.ses['isadmin']:
+            where['id'] = data['id']
+        else:
+            where['id'] = self.ses['uid']
+       
+        for k in ['username', 'status', 'password', 'extend']:
+            if k == 'password' and data.get('password'):
+                values['password'] = userbase.create_password(data['password'])
+            elif k == 'extend' and data.get('extend'):
+                x = json.loads(data.get('extend'))
+                values['extend'] = data['extend']
+            else:
+                values[k] = data[k]
 
-class UserRegister (UserBase):
-    def get(self):
-        try:
-            self.register()
-        except Exception, e:
-            log.error(traceback.format_exc())
-            self.failed()
+        with get_connection(self.dbname) as conn:
+            conn.update(self.table, values, where)
 
-class UserInfo (UserBase):
-    def GET(self):
-        valid = [Field(name='id',match=TypeInt), Field(name='email',match=TypeStr)]
-        data  = web.input(self.request, valid)
-        email = data.getv('email', None)
-        uid   = data.getv('id')
-        if not uid and not email:
-            return failed('user id/email error')
-        try:
-            ret = Users.db().select().where(data).query()
-            return self.succ(ret)
-        except Exception, e:
-            return self.failed()
+        values['id'] = where['id']
+        return self.succ(values)
 
-    def succ(self, data):
-        return {'ret':0, 'data':data}
- 
-class UserModify (UserBase):
-    def GET(self):
-        valid = [Field(name='id',match=TypeInt), 
-                 Field(name='mobile',match=TypeStr,isnull=True),
-                 Field(name='email',match=TypeStr,isnull=True),
-                 Field(name='password',match=TypeAscStr,isnull=True),
-                 Field(name='status',match=TypeInt,isnull=True),
-                 Field(name='extend',match=TypeStr,isnull=True),
-                ]
-        data = web.input(self.request, valid)
-        uid = data.getv('id')
-        if not uid:
-            return failed('user id error')
-        if len(data) == 1:
-            return failed('argument error')
-        try:
-            del data['id']
-            Users.db().update(data).where(id=userid).execute()
+class User (UserBase):
+    def GET(self, name=None):
+        # select
+        if name == 'login':  # /login
+            return self.login()
+        elif name == 'logout': # /logout
+            if self.ses:
+                self.ses.remove()
             return self.succ()
-        except Exception, e: 
-            return self.failed()
-        
+        elif name: # /id
+            return self.get_user()
+        else: # list
+            return self.get_user_list()
 
-class UserList (UserBase):
-    pass
+    def POST(self):
+        # create
+        return self.register()
 
-class UserLog (UserBase):
-    pass
-
-
-
+    def PUT(self):
+        # update
+        return self.modify_user()
 
