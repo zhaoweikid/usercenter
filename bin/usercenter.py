@@ -1,160 +1,123 @@
 # coding: utf-8
 import os, sys
 import json, random, hashlib
-from zbase.base.logger import log
 from zbase.web import core 
-import pdb
-
+import logging
+from userbase import BaseHandler
+#import pdb
 #pdb.set_trace()
 
-ERR  = -1
+log = logging.getLogger()
 
-class Index (RequestHandler):
-    def get(self):
-        self.write('haha, good!')
+class Ping (core.Handler):
+    def GET(self):
+        self.write('pong')
 
-class UserBase (RequestHandler):
+
+class UserBase (BaseHandler):
     table  = 'users'
     dbname = 'usercenter'
-    login_validator    = [Field(name='password',match=TypeAscStr), 
-                          Field(name='email',match=TypeEmail)]
-    register_validator = [Field(name='password',match=TypeAscStr), 
-                          Field(name='email',match=TypeEmail)]
     
-    def get(self, name):
-        try:
-            func = getattr(self, name)
-            return func()
-        except:
-            log.info(traceback.format_exc())
-            return self.failed()
-
-    def post(self, name):
-        return self.get(name)
-
-    def succ(self, ses=None):
-        if ses:
-            obj = {'ret':0, 'uid':ses['uid']}
-            s = json.dumps(obj)
-            log.info('succ: %s', s)
-            self.write(s)
-            return
-            #return {'ret':0, 'uid':ses['uid']}
-        log.info('succ')
-        self.write('{"ret":0}')
-
-    def failed(self, errstr=u'内部错误'):
-        log.info("failed: %s", errstr)
-        obj = {'ret':ERR, 'error':errstr}
-        s = json.dumps(obj)
-        log.info('failed: %s', s)
-        self.write(s)
-
-
-    def create_password(self, passwd, salt=None):
-        if salt is None:
-            salt = random.randint(1, 1000000)
-        saltstr = '%06d' % salt 
-        return 'sha1$%s$%s' % (salt, hashlib.sha1(passwd+saltstr).hexdigest())
-
+    @with_validator([Field(name='password',match=TypeAscStr), 
+                     Field(name='username',match=TypeStr),
+            ])
     def login(self):
-        data = web.input(self.request, self.login_validator)
+        data = self.validtor.data
     
-        conn = dbpool.acquire(self.dbname)
         try:
-            username = data.get('username', InputNone)
-            password = data.get('password', InputNone)
-            email    = data.get('email', InputNone)
-            log.info("username:%s email:%s password:%s" % (username.v, email.v, password.v))
+            username = data.get('username')
+            password = data.get('password')
+            log.info("username:%s password:%s" % (username, password))
  
-            if not password.v:
-                return self.failed('password must not null')
+            if not password:
+                return self.fail('password must not null')
 
-            if email.v:
-                self.login_key = 'email'
-            elif username.v:
-                self.login_key = 'username'
-            else:
-                return self.failed('username or email must not null')
+            login_key = 'username'
+            if re.match(TYPE_MAP[T_MAIL]):
+                login_key = 'email'
+            elif re.match(TYPE_MAP[T_MOBILE]):
+                login_key = 'mobile' 
 
-            keydata  = data.get(self.login_key, InputNone).v
-            if not keydata:
-                return self.failed(self.login_key + ' must not null')
+            with get_connection(self.dbname) as conn:
+                where = {
+                    login_key: username
+                }
+                ret = conn.select_one(self.table, where, "id,username,email,password")
+                if not ret:
+                    return self.fail(login_key + ' not found')
 
-            ret = conn.get("select id,username,email,password from %s where %s='%s'" % \
-                            (self.table, self.login_key, conn.escape(keydata)), isdict=False)
-            if not ret:
-                return self.failed(self.login_key + ' not found')
-
-            px = ret[3].split('$')
-            pass_enc = self.create_password(password.v, px[1])
-            if ret[3] != pass_enc:
-                return self.failed('password error')
+            px = ret['password'].split('$')
+            pass_enc = userbase.create_password(password, px[1])
+            if ret['password'] != pass_enc:
+                return self.fail('password error')
                     
-            ses = session.Session()
-            ses.start()
-            ses['uid']      = ret[0]
-            ses['username'] = ret[1]
-            ses['email']    = ret[2]
-            ses.end(self.request)
+            self.create_session()
+            self.ses['uid']      = ret['id']
+            self.ses['username'] = ret['username']
+            self.ses['email']    = ret['email']
 
-            resp = self.succ(ses)
+            resp = self.succ({'uid':ret['id']})
             return resp
         except Exception, e:
             log.error(traceback.format_exc())
-            return self.failed('Exception:' + str(e))
-        finally:
-            dbpool.release(conn)
+            return self.fail('Exception:' + str(e))
 
 
     @session.check_login
     def logout(self):
-        self.ses.clear() 
+        self.ses.delete() 
         return self.succ()
 
+
+    @with_validator([Field(name='password',match=T_STR), 
+                     Field(name='username',match=T_STR),
+                     Field(name='email',match=T_EMAIL),
+                     Field(name='mobile',match=T_MOBILE),
+            ])
     def register(self):
         log.info('register')
-        data = web.input(self.request, self.register_validator)
+        data = self.validtor.data
         log.info('data:%s', data)
         
-        email = data.getv('email','')
-        pass_enc = self.create_password(data.getv('password'))
-        data.get('password').setval([pass_enc])
-        keys = ['email','password']
-        keystr = ','.join(keys)
-        #log.info([ x for x in data.iterkeys()])
-        #valstr = ','.join([dbmodel.Value(x.v) for x in data.iterkeys() if x in keys])  
+        email = data.get('email','')
+        mobile = data.get('mobile','')
+        username = data.get('username','')
+        password = data.get('password','')
+        pass_enc = userbase.create_password(password)
 
-        conn = dbpool.acquire(self.dbname)
         try:
-            sql = "select id from %s where email='%s'" % (self.table, email)
-            log.info(sql)
-            ret = conn.query(sql)
-            if len(ret) >= 1:
-                return self.failed('username or email exist')
+            where = {}
+            if email:
+                where['email'] = email
+            if mobile:
+                where['mobile'] = mobile
+            if username:
+                where['username'] = username
 
-            email_esc = conn.escape(email)
-            #sql = "insert into %s(%s) values (%s)" % (self.table, keystr, valstr)
-            sql = "insert into %s(email,password,username) values ('%s','%s','%s')" % \
-                (self.table, email_esc, conn.escape(pass_enc), email_esc)
-            log.info(sql)
-            conn.execute(sql)
+            insertdata = {
+                'username': username,
+                'email': email,
+                'mobile': mobile,
+                'password': password,
+            }
+
+            with get_connection(self.dbname) as conn:
+                ret = conn.select(self.table, where, 'id')
+                if len(ret) >= 1:
+                    return self.failed('username or email or mobile exist')
+                conn.insert(self.table, insertdata)
             lastid = conn.last_insert_id()
             
-            ses = session.session_start()
+            ses = session.create_session()
             ses['uid'] = lastid
             ses['username'] = data.getv('username', '')
             ses['email']    = email
-            ses.end(self)
 
             resp = self.succ(ses)
             return resp
         except Exception, e:
             log.error(traceback.format_exc())
             return self.failed('error:' + str(e))
-        finally:
-            dbpool.release(conn)
-
 
 
 class UserLogin (UserBase):
@@ -225,10 +188,6 @@ class UserList (UserBase):
     pass
 
 class UserLog (UserBase):
-    pass
-
-
-class GroupBase (RequestHandler):
     pass
 
 

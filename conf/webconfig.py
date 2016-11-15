@@ -37,4 +37,4 @@ CHARSET = 'UTF-8'
 # store:DiskSessionStore, expire:x, path:/tmp
 # store:RedisSessionStore, expire:x, 'addr':[(ip,port)]
 # store:MemcachedSessionStore, expire:x, addr:[(ip,port)]
-SESSION = {'store':'DiskSessionStore', 'expire':30, 'path':'/tmp'}
+#SESSION = {'store':'DiskSessionStore', 'expire':30, 'path':'/tmp'}
