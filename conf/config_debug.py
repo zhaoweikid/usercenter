@@ -15,11 +15,11 @@ PORT = 6200
 DEBUG = True
 
 # 日志文件配置
-LOGFILE = 'stdout'
+LOGFILE = {'root':{'filename':'stdout', 'level':'DEBUG'}}
 
 # 数据库配置
 DATABASE = {
-    'test': {
+    'usercenter': {
         'engine':'mysql',
         'db': 'usercenter',
         'host': '127.0.0.1',
@@ -32,6 +32,8 @@ DATABASE = {
 }
 
 
-SESSION = {'type':'SessionRedis', 
-           'server':[{'addr':('127.0.0.1', 379), 'timeout':1000}], 
-           'expire':3600}
+SESSION = {
+    'type':'SessionRedis', 
+    'server':[{'addr':('127.0.0.1', 6379), 'timeout':1000}], 
+    'expire':3600,
+}

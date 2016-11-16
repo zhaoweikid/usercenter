@@ -1,10 +1,12 @@
 # coding: utf-8
 import os, sys
 import json, random, hashlib
-from zbase.web import core 
+from zbase.web import core
 from zbase.web.validator2 import *
+from zbase.base.dbpool import get_connection
+from zbase.utils import createid
 import logging
-from userbase import BaseHandler, check_login
+from userbase import BaseHandler, check_login, create_password
 #import pdb
 #pdb.set_trace()
 
@@ -21,7 +23,7 @@ class UserBase (BaseHandler):
     
     @with_validator(['username', 'password'])
     def login(self):
-        data = self.validtor.data
+        data = self.validator.data
     
         try:
             username = data.get('username')
@@ -32,9 +34,9 @@ class UserBase (BaseHandler):
                 return self.fail('password must not null')
 
             login_key = 'email'
-            if re.match(TYPE_MAP[T_MAIL]):
+            if TYPE_MAP[T_MAIL].match(username):
                 login_key = 'email'
-            elif re.match(TYPE_MAP[T_MOBILE]):
+            elif TYPE_MAP[T_MOBILE].match(username):
                 login_key = 'mobile'
             else:
                 return self.fail('login key error, must email/mobile')
@@ -48,7 +50,7 @@ class UserBase (BaseHandler):
                     return self.fail(login_key + ' not found')
 
             px = ret['password'].split('$')
-            pass_enc = userbase.create_password(password, px[1])
+            pass_enc = create_password(password, int(px[1]))
             if ret['password'] != pass_enc:
                 return self.fail('password error')
            
@@ -68,14 +70,14 @@ class UserBase (BaseHandler):
             ])
     def register(self):
         log.info('register')
-        data = self.validtor.data
+        data = self.validator.data
         log.info('data:%s', data)
         
         email = data.get('email','')
         mobile = data.get('mobile','')
         username = data.get('username','')
         password = data.get('password','')
-        pass_enc = userbase.create_password(password)
+        pass_enc = create_password(password)
 
         try:
             where = {}
@@ -93,15 +95,17 @@ class UserBase (BaseHandler):
                 'password': pass_enc,
             }
 
+
+            lastid = -1
             with get_connection(self.dbname) as conn:
                 ret = conn.select(self.table, where, 'id')
                 if len(ret) >= 1:
                     return self.fail('username or email or mobile exist')
+                insertdata['id'] = createid.new_id64(conn=conn)
                 conn.insert(self.table, insertdata)
-                lastid = conn.last_insert_id()
             
-            self.create_user_session({'uid':lastid, 'username':username, 'isadmin':0})
-            resp = self.succ({'uid':lastid})
+            self.create_user_session({'uid':insertdata['id'], 'username':username, 'isadmin':0})
+            resp = self.succ({'uid':insertdata['id']})
             return resp
         except Exception, e:
             log.error(traceback.format_exc())
@@ -135,6 +139,7 @@ class UserBase (BaseHandler):
         page = None
         with get_connection(self.dbname) as conn:
             page = conn.select_page(self.table, sql, pagecur=pagecur, pagesize=pagesize)
+
         pagedata = {
             'cur':page.page, 
             'size':page.pagesize, 
@@ -150,7 +155,7 @@ class UserBase (BaseHandler):
     ]) 
     def modify_user(self):
         # modify username/status/password/extend
-        data = self.validtor.data
+        data = self.validator.data
         values = {}
         where  = {}
         if self.ses['isadmin']:
@@ -160,12 +165,14 @@ class UserBase (BaseHandler):
        
         for k in ['username', 'status', 'password', 'extend']:
             if k == 'password' and data.get('password'):
-                values['password'] = userbase.create_password(data['password'])
+                values['password'] = create_password(data['password'])
             elif k == 'extend' and data.get('extend'):
                 x = json.loads(data.get('extend'))
                 values['extend'] = data['extend']
             else:
                 values[k] = data[k]
+
+        values['uptime'] = int(time.time())
 
         with get_connection(self.dbname) as conn:
             conn.update(self.table, values, where)

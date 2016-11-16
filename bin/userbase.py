@@ -23,10 +23,10 @@ def get_session(classname):
 
 
 def check_login(f):
-    def _(f, *args, **kwargs):
-        if not f.ses or not f.ses['uid']:
-            return f.fail('please login')
-        f(*args, **kwargs)
+    def _(self, *args, **kwargs):
+        if not self.ses or not self.ses['uid']:
+            return self.fail('please login')
+        f(self, *args, **kwargs)
     return _
 
 
@@ -37,9 +37,9 @@ class BaseHandler (core.Handler):
         sid = self.get_cookie('sid')
         log.info('sid:%s', sid)
         if sid: 
-            sescls = get_session(config['SESSION']['type'])
-            self.ses = sescls(config['SESSION']['server'], sid=sid,
-                    expire=config['SESSION']['expire'])
+            sescls = get_session(config.SESSION['type'])
+            self.ses = sescls(sid, server=config.SESSION['server'][0],
+                    expire=config.SESSION['expire'])
 
         #if not sid and self.req.path != '/v1/user/register':
         #    return self.fail('please login first')
@@ -49,9 +49,10 @@ class BaseHandler (core.Handler):
             self.ses.save()
             self.set_cookie('sid', self.ses.sid)
 
-    def create_sesson(self):
-        sescls = get_session(config['SESSION']['type'])
-        self.ses = sescls(config['SESSION']['server'], expire=config['SESSION']['expire'])
+    def create_session(self):
+        log.debug('session config: %s', config.SESSION)
+        sescls = get_session(config.SESSION['type'])
+        self.ses = sescls(server=config.SESSION['server'][0], expire=config.SESSION['expire'])
         return self.ses
 
     def succ(self, data=None):
