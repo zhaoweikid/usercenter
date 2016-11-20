@@ -1,6 +1,7 @@
 # coding: utf-8
 import os, sys
 import json, random, hashlib
+import time
 from zbase.web import core
 from zbase.web.validator2 import *
 from zbase.base.dbpool import get_connection
@@ -28,7 +29,7 @@ class UserBase (BaseHandler):
         try:
             username = data.get('username')
             password = data.get('password')
-            log.info("username:%s password:%s" % (username, password))
+            #log.info("username:%s password:%s" % (username, password))
  
             if not password:
                 return self.fail('password must not null')
@@ -48,6 +49,7 @@ class UserBase (BaseHandler):
                 ret = conn.select_one(self.table, where, "id,username,email,password,isadmin")
                 if not ret:
                     return self.fail(login_key + ' not found')
+                conn.update(self.table, where, {'logtime':int(time.time())})
 
             px = ret['password'].split('$')
             pass_enc = create_password(password, int(px[1]))
@@ -81,20 +83,22 @@ class UserBase (BaseHandler):
 
         try:
             where = {}
+            insertdata = {
+                'password': pass_enc,
+                'ctime': int(time.time()),
+            }
             if email:
                 where['email'] = email
+                insertdata['email'] = email
             if mobile:
                 where['mobile'] = mobile
+                insertdata['mobile'] = mobile
             if username:
                 where['username'] = username
+                insertdata['username'] = username
 
-            insertdata = {
-                'username': username,
-                'email': email,
-                'mobile': mobile,
-                'password': pass_enc,
-            }
-
+            if not email and not mobile:
+                return self.fail('email/mobile must not null')
 
             lastid = -1
             with get_connection(self.dbname) as conn:
@@ -151,7 +155,6 @@ class UserBase (BaseHandler):
     @check_login
     @with_validator(['username', 'password', 'extend',
                      F('id', T_INT),
-                     F('status', T_INT),
     ]) 
     def modify_user(self):
         # modify username/status/password/extend
@@ -163,19 +166,21 @@ class UserBase (BaseHandler):
         else:
             where['id'] = self.ses['uid']
        
-        for k in ['username', 'status', 'password', 'extend']:
+        for k in ['username', 'password', 'extend']:
             if k == 'password' and data.get('password'):
                 values['password'] = create_password(data['password'])
             elif k == 'extend' and data.get('extend'):
                 x = json.loads(data.get('extend'))
                 values['extend'] = data['extend']
-            else:
+            elif data[k]:
                 values[k] = data[k]
 
         values['uptime'] = int(time.time())
 
         with get_connection(self.dbname) as conn:
-            conn.update(self.table, values, where)
+            ret = conn.update(self.table, values, where)
+            if ret != 1:
+                return self.fail('condition error')
 
         values['id'] = where['id']
         return self.succ(values)
@@ -201,4 +206,6 @@ class User (UserBase):
     def PUT(self):
         # update
         return self.modify_user()
+
+
 
