@@ -20,12 +20,12 @@ LOGFILE = {'root':{'filename':'stdout', 'level':'DEBUG'}}
 # 数据库配置
 DATABASE = {
     'usercenter': {
-        'engine':'mysql',
+        'engine':'pymysql',
         'db': 'usercenter',
         'host': '127.0.0.1',
         'port': 3306,
         'user': 'root',
-        'passwd': '123456',
+        'passwd': '654321',
         'charset': 'utf8',
         'conn': 10,
     },

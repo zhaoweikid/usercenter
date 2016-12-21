@@ -42,14 +42,19 @@ class UserBase (BaseHandler):
             else:
                 return self.fail('login key error, must email/mobile')
 
+            ret = None
             with get_connection(self.dbname) as conn:
                 where = {
                     login_key: username
                 }
+                log.debug('where:%s', where)
                 ret = conn.select_one(self.table, where, "id,username,email,password,isadmin")
+                log.debug('select:%s', ret)
                 if not ret:
                     return self.fail(login_key + ' not found')
                 conn.update(self.table, where, {'logtime':int(time.time())})
+            if not ret:
+                return self.fail('db error')
 
             px = ret['password'].split('$')
             pass_enc = create_password(password, int(px[1]))
