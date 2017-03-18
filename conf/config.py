@@ -15,7 +15,7 @@ PORT = 6200
 DEBUG = False
 
 # 日志文件配置
-LOGFILE = os.path.join(HOME, '../log/project.log')
+LOGFILE = os.path.join(HOME, '../log/usercenter.log')
 
 # 数据库配置
 DATABASE = {
