@@ -38,7 +38,7 @@ class BaseHandler (core.Handler):
         log.info('sid:%s', sid)
         if sid: 
             sescls = get_session(config.SESSION['type'])
-            self.ses = sescls(sid, server=config.SESSION['server'][0],
+            self.ses = sescls(server=config.SESSION['server'][0], sid=sid,
                     expire=config.SESSION['expire'])
 
         #if not sid and self.req.path != '/v1/user/register':
