@@ -55,17 +55,13 @@ def request(url, method, values=None):
 
 def main():
     prefix_url = 'http://127.0.0.1:6200/v1'
-    xid = 12
-
+    xid = 13
 
     #url = 'http://127.0.0.1:6200/v1/user?mobile=13800000%03d&password=123456&username=zhaowei%d&email=zhaowei%d@qq.com' % (xid, xid, xid)
     #request(url, 'POST')
 
-
     url = prefix_url + '/user/login?password=123456&username=zhaowei%d@qq.com' % (xid)
     obj = request(url, 'GET')
-
-    return
 
     url = prefix_url + '/user/%d' % (obj['data']['uid'])
     request(url, 'GET')
