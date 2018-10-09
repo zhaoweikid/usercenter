@@ -8,7 +8,7 @@ from webconfig import *
 HOST = '0.0.0.0'
 
 # 服务端口
-PORT = 6200
+PORT = 6300
 
 # 调试模式: True/False
 # 生产环境必须为False

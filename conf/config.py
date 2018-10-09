@@ -8,7 +8,7 @@ from webconfig import *
 HOST = '0.0.0.0'
 
 # 服务端口
-PORT = 6200
+PORT = 6300
 
 # 调试模式: True/False
 # 生产环境必须为False
@@ -32,5 +32,5 @@ DATABASE = {
 }
 
 SESSION = {'type':'SessionRedis', 
-           'server':[{'addr':('127.0.0.1', 379), 'timeout':1000}], 
+           'server':[{'addr':('127.0.0.1', 6379), 'timeout':1000}], 
            'expire':3600}

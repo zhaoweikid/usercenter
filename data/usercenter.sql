@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
 	extend varchar(8192),
 	key (username, email, mobile)
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
-insert into users(id,username,password,ctime,status,isadmin) values (1,'admin','uc+admin',UNIX_TIMESTAMP(now()),2,1);
+insert into users(id,username,password,ctime,status,isadmin) values (1,'admin','',UNIX_TIMESTAMP(now()),2,1);
 
 -- 基本设置
 DROP TABLE settings;
@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS groups (
 	ctime int(11) unsigned,
 	uptime int(11) unsigned
 )ENGINE=InnoDB DEFAULT CHARSET=utf8; 
+
 insert into groups(id,name,userid,perm,ctime,uptime) values (1,'admin',1,1,UNIX_TIMESTAMP(now()),UNIX_TIMESTAMP(now()));
 
 -- 用户组关系 user<=>group
@@ -66,16 +67,5 @@ CREATE TABLE IF NOT EXISTS usergroup (
 	ctime int(11) unsigned
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
 insert into usergroup(id,userid,groupid,ctime) values (1,1,1,UNIX_TIMESTAMP(now()));
-
--- 用户日志
-DROP TABLE userlog;
-CREATE TABLE IF NOT EXISTS userlog (
-	id bigint(20) not null primary key,
-	userid bigint(20) not null,
-	opuserid bigint(20) not null, -- 执行动作的用户
-	action varchar(32) not null, -- login,logout,reg,modify,...
-	content varchar(4096),
-	ctime datetime
-)ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 
