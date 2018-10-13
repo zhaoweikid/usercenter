@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS users (
 	extend varchar(8192),
 	key (username, email, mobile)
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
-insert into users(id,username,password,ctime,status,isadmin) values (1,'admin','',UNIX_TIMESTAMP(now()),2,1);
+insert into users(id,username,password,ctime,status,isadmin) values (1,'admin','sha1$123456$71dd07494c5ee54992a27746d547e25dee01bd97',UNIX_TIMESTAMP(now()),2,1);
 
 -- 基本设置
 DROP TABLE settings;

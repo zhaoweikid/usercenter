@@ -3,6 +3,7 @@
 import usercenter
 
 urls = (
+    ('/v1/user/ping', "usercenter.Ping"),
     # select, update
     ('^/v1/user/([a-zA-Z0-9_]+)$', "usercenter.User"),
     # select/create

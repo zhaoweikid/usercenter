@@ -14,9 +14,10 @@ from userbase import *
 
 log = logging.getLogger()
 
-class Ping (core.Handler):
+class Ping (BaseHandler):
     def GET(self):
-        self.write('pong')
+        data = {'time':int(time.time()), 'content':'pong'}
+        self.succ(data)
 
 
 class UserBase (BaseHandler):
