@@ -19,12 +19,12 @@ LOGFILE = os.path.join(HOME, '../log/usercenter.log')
 
 # 数据库配置
 DATABASE = {
-    'test': {
+    'usercenter': {
         'engine':'pymysql',
-        'db': 'test',
+        'db': 'usercenter',
         'host': '127.0.0.1',
         'port': 3306,
-        'user': 'root',
+        'user': 'zhaowei',
         'passwd': '654321',
         'charset': 'utf8',
         'conn': 10,
