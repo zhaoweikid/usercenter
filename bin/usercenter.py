@@ -2,6 +2,7 @@
 import os, sys
 import json, random, hashlib
 import time
+import copy
 from zbase3.web import core
 from zbase3.web.validator import *
 from zbase3.base.dbpool import get_connection
@@ -23,6 +24,20 @@ class Ping (BaseHandler):
 class UserBase (BaseHandler):
     table  = 'users'
     dbname = 'usercenter'
+
+
+    @cache.with_cache(60)
+    def login_settings(self):
+        retdata = {}
+        with get_connection(self.dbname) as conn:
+            ret = conn.select('settings')
+            if not ret:
+                retdata = {}
+            else:
+                for row in ret:
+                    retdata[row['name']] = row['value']
+
+        return retdata
     
     @with_validator([F('username'), F('password', must=True), F('email', T_MAIL), F('mobile', T_MOBILE)])
     def login(self):
@@ -131,14 +146,50 @@ class UserBase (BaseHandler):
         userid = self.ses['userid']
         where = {'id':userid}
         user = None
+        groups = None
         with get_connection(self.dbname) as conn:
             user = conn.select_one(self.table, where)
             if not user:
                 return self.fail(ERR_USER, 'not have user info')
+
+            groups = conn.query('select g.id as id,g.name as name from user_group ug, groups g where g.id=ug.groupid and ug.userid=%d' % userid)
+            user['group'] = groups     
+
+            user['role'] = []
+            user['perm'] = []
+            user['allperm'] = []
+
+            userperm = conn.query('select permid,roleid from user_perm where userid=%d' % userid)
+            if userperm:
+                roles = [ x['roleid'] for x in userperm if x['roleid']>0 ]
+                perms = [ x['permid'] for x in userperm if x['permid']>0 ]
+        
+                if roles:
+                    ret = conn.select('roles', where={'id':('in', roles)}, fields='id,name')
+                    if ret:
+                        user['role'] = ret
+
+                if perms:
+                    ret = conn.select('perms', where={'id':('in', perms), fields='id,name'}
+                    if ret:
+                        user['perm'] = ret
+                        user['allperm'] = ret
+
+                if roles:
+                    ret = conn.query('select p.id as id,p.name as name from perm p, role_perm rp where rp in (%s) and rp.permid=p.id' % \
+                        (conn.exp2sql('rp.roleid', 'in', roles)))
+                    if ret:
+                        xids = [x['id'] for x in user['allperm']]
+                        for row in ret:
+                            if row['id'] not in xids:
+                                user['allperm'].append(row)
+
+
         for k in ['password', 'regip', 'isadmin']:
             user.pop(k)
 
         user['id'] = str(user['id'])
+        
 
         if user['extend']:
             user['extend'] = json.loads(user['extend'])
@@ -180,14 +231,14 @@ class UserBase (BaseHandler):
                      F('extend'),
                      F('id', T_INT),
     ]) 
-    def modify_user(self, userid):
+    def modify_user(self):
         # modify username/status/password/extend
-        userid = int(userid)
-        isadmin = self.ses['isadmin']
-        suid = self.ses['userid']
+        #userid = int(userid)
+        #isadmin = self.ses['isadmin']
+        userid = self.ses['userid']
 
-        if not isadmin and userid != suid:
-            return self.fail(ERR_PERM)
+        #if not isadmin and userid != suid:
+        #    return self.fail(ERR_PERM)
 
         data = self.validator.data
         values = {}
@@ -202,7 +253,7 @@ class UserBase (BaseHandler):
             elif data[k]:
                 values[k] = data[k]
 
-        values['uptime'] = int(time.time())
+        values['utime'] = int(time.time())
 
         with get_connection(self.dbname) as conn:
             ret = conn.update(self.table, values, where)
@@ -212,6 +263,82 @@ class UserBase (BaseHandler):
         values['id'] = str(where['id'])
         return self.succ(values)
 
+    @with_validator([F('groupid', T_INT)])
+    def add_group(self):
+        data = self.validator.data
+        groupid = data.get('groupid')
+       
+        t = int(time.time())
+        with get_connection(self.dbname) as conn:
+            data = {
+                'id': createid.new_id64(conn=conn),
+                'userid':self.ses['userid'],
+                'groupid':groupid,
+                'ctime':t),
+                'utime':t,
+            }
+            ret = conn.insert('user_group', data)
+            if ret != 1:
+                return self.fail(ERR_DB)
+
+            ret = conn.select_one('user_group', where={'id':data['id']}
+            return succ(ret)
+
+
+    @with_validator([F('groupid', T_INT)])
+    def del_group(self):
+        data = self.validator.data
+        groupid = data.get('groupid')
+        userid = self.ses['userid']
+
+        with get_connection(self.dbname) as conn:
+            ret = conn.delete('user_group', where={'userid':userid, 'groupid':groupid})
+            return self.succ(ret)
+
+    def add_perm_role(self):
+        data = self.validator.data
+        roleid = data.get('roleid')
+        permid = data.get('permid')
+       
+        t = int(time.time())
+        with get_connection(self.dbname) as conn:
+            data = {
+                'id': createid.new_id64(conn=conn),
+                'userid':self.ses['userid'],
+                'roleid':0,
+                'permid':0,
+                'ctime':t),
+                'utime':t,
+            }
+            if roleid:
+                data['roleid'] = roleid
+            else:
+                data['permid'] = permid
+                
+            ret = conn.insert('user_perm', data)
+            if ret != 1:
+                return self.fail(ERR_DB)
+
+            ret = conn.select_one('user_perm', where={'id':data['id']}
+            return succ(ret)
+
+
+    @with_validator([F('groupid', T_INT)])
+    def del_perm_role(self):
+        data = self.validator.data
+        roleid = data.get('roleid')
+        permid = data.get('permid')
+
+        with get_connection(self.dbname) as conn:
+            if roleid:
+                ret = conn.delete('user_perm', where={'userid':userid, 'roleid':('in', roleids)})
+            if permid:
+                ret = conn.delete('user_perm', where={'userid':userid, 'permid':('in', permids)})
+
+            return self.succ()
+
+
+
 class User (UserBase):
     noses_path = {
         '/v1/user':'POST', 
@@ -220,24 +347,38 @@ class User (UserBase):
 
     def GET(self, name=None):
         # select
-        if name == 'login':  # /login
-            return self.login()
-        elif name == 'logout': # /logout
-            if self.ses:
-                self.ses.remove()
-            return self.succ()
-        elif name: # /id
-            return self.get_user()
-        else: # list
-            return self.get_user_list()
+        try:
+            if name == 'login':  # /login
+                return self.login()
+            elif name == 'logout': # /logout
+                if self.ses:
+                    self.ses.remove()
+                return self.succ()
+            elif name == 'q':
+                return self.get_user()
+            elif name == 'list':
+                return self.get_user_list()
+        except:
+            self.fail(ERR_PARAM)
 
-    def POST(self):
-        # create
-        return self.register()
+    def POST(self, name):
+        try:
+            if name == 'signup':
+                return self.register()
+            elif name == 'mod':
+                return self.modify_user()
+            elif name == 'addgroup':
+                return self.add_group()
+            elif name == 'delgroup':
+                return self.del_group()
+            elif name == 'addperm':
+                return self.add_perm_role()
+            elif name == 'delperm':
+                return self.del_perm_role()
 
-    def PUT(self, userid):
-        # update
-        return self.modify_user(userid)
+        except:
+            self.fail(ERR_PARAM)
+
 
     def error(self, data):
         self.fail(ERR_PARAM)
@@ -249,9 +390,6 @@ class User (UserBase):
         return self.req.inputjson()
 
 
+ 
 
-
-
-
-
-
+      

@@ -3,6 +3,7 @@ CREATE DATABASE usercenter CHARSET utf8 COLLATE utf8_general_ci;
 USE usercenter;
 SET NAMES utf8;
 
+-- 用户表
 DROP TABLE users;
 CREATE TABLE IF NOT EXISTS users (
 	id bigint not null primary key,
@@ -14,7 +15,7 @@ CREATE TABLE IF NOT EXISTS users (
 	score int(11) not null default 0, -- 积分
 	stage int(11) not null default 1, -- 等级
 	ctime int(11) unsigned, -- 创建时间
-	uptime int(11) unsigned, -- 更新时间
+	utime int(11) unsigned, -- 更新时间
 	logtime int(11) unsigned, -- 最后一次登陆时间
 	regip varchar(128) not null default '',
 	status tinyint default 0, -- 1未验证 2正常 3封禁 4删除
@@ -24,48 +25,120 @@ CREATE TABLE IF NOT EXISTS users (
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
 insert into users(id,username,password,ctime,status,isadmin) values (1,'admin','sha1$123456$71dd07494c5ee54992a27746d547e25dee01bd97',UNIX_TIMESTAMP(now()),2,1);
 
--- 基本设置
+-- 与第三方系统关联的账号
+DROP TABLE openuser;
+CREATE TABLE IF NOT EXISTS openuser (
+	id bigint(20) not null primary key,
+	userid bigint(20) not null,
+	outplat varchar(128) not null COMMENT '第三方系统名称，支持：wx/alipay/qq/taobao 等',
+	appid varchar(128) not null default '' COMMENT '第三方系统账号',
+	openid varchar(128) not null default '' COMMENT '第三方系统识别的用户id',
+	ctime int(11) unsigned,
+	utime int(11) unsigned,
+	key (appid, openid)
+);
+
+-- 用户组，同时表示了组织关系
+DROP TABLE groups;
+CREATE TABLE IF NOT EXISTS groups (
+	id bigint(20) not null primary key,
+	parentid bigint(20) not null COMMENT '上级组',
+	name varchar(128) not null unique,
+	ctime int(11) unsigned,
+	utime int(11) unsigned
+)ENGINE=InnoDB DEFAULT CHARSET=utf8; 
+
+insert into groups(id,name,userid,perm,ctime,utime) values (1,'admin',1,1,UNIX_TIMESTAMP(now()),UNIX_TIMESTAMP(now()));
+
+-- 用户和组的关系
+DROP TABLE user_group;
+CREATE TABLE IF NOT EXISTS user_group (
+	id bigint(20) not null primary key,
+	userid bigint(20) not null,
+	groupid bigint(20) not null,
+	ctime int(11) unsigned,
+	utime int(11) unsigned
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+insert into user_group(id,userid,groupid,ctime) values (1,1,1,UNIX_TIMESTAMP(now()));
+
+
+
+-- 基本设置。比如针对密码的要求
 DROP TABLE settings;
 CREATE TABLE IF NOT EXISTS settings (
 	id bigint(20) not null primary key,
-	userid bigint(20) not null,
 	name varchar(128) not null,
 	value varchar(512) not null,
+	ctime int(11) unsigned,
+	utime int(11) unsigned,
 	key (userid),
 	key (name)
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
--- 权限表
-DROP TABLE perm;
-CREATE TABLE IF NOT EXISTS perm (
-	id bigint(20) not null primary key,
-    name varchar(128) not null unique,
-    memo varchar(128)  
-)ENGINE=InnoDB DEFAULT CHARSET=utf8;
-insert into perm(id,name,memo) values (1,'sysadmin','系统管理');
-insert into perm(id,name,memo) values (2,'default','普通用户');
+-- 设置密码强度: 1.任意8字符 2.包含数字和英文的8字符 3.包含数字和英文小写、英文大写的8字符 4.包含数字、英文大写、英文小写、其他符号的8字符
+insert into settings(id,name,value,ctime,utime) values (1, 'pwd_strength', '2', now(), now());
+-- 密码过期时间, 单位天，为0表示永不过期
+insert into settings(id,name,value,ctime,utime) values (2, 'pwd_expire', '0', now(), now());
+-- 10分钟内最大密码错误次数，超过次数后会被锁定
+insert into settings(id,name,value,ctime,utime) values (3, 'pwd_err_count', '3', now(), now());
+-- 密码错误后的锁定时间，单位分钟
+insert into settings(id,name,value,ctime,utime) values (4, 'pwd_lock_time', '10', now(), now());
 
--- 组
-DROP TABLE groups;
-CREATE TABLE IF NOT EXISTS groups (
-	id bigint(20) not null primary key,
-	name varchar(128) not null unique,
-	userid bigint(20) not null, -- 拥有人
-	perm varchar(4096) not null, -- 组权限
-	ctime int(11) unsigned,
-	uptime int(11) unsigned
-)ENGINE=InnoDB DEFAULT CHARSET=utf8; 
-
-insert into groups(id,name,userid,perm,ctime,uptime) values (1,'admin',1,1,UNIX_TIMESTAMP(now()),UNIX_TIMESTAMP(now()));
-
--- 用户组关系 user<=>group
-DROP TABLE usergroup;
-CREATE TABLE IF NOT EXISTS usergroup (
+-- 用户登录记录
+DROP TABLE `login_record`;
+CREATE TABLE IF NOT EXISTS `perm` (
 	id bigint(20) not null primary key,
 	userid bigint(20) not null,
-	groupid bigint(20) not null,
+	action varchar(128) not null,
+	state smallint not null default 1 COMMENT '登录结果，1.成功 0.失败',
+	memo varchar(512) COMMENT '其他信息',
 	ctime int(11) unsigned
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
-insert into usergroup(id,userid,groupid,ctime) values (1,1,1,UNIX_TIMESTAMP(now()));
+
+-- 权限表
+DROP TABLE `perms`;
+CREATE TABLE IF NOT EXISTS `perms` (
+	id bigint(20) not null primary key,
+    name varchar(128) not null unique COMMENT '权限名称',
+    info varchar(128) COMMENT '权限描述',
+	ctime int(11) unsigned,
+	utime int(11) unsigned
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+insert into perms(id,name,memo) values (1,'sysadmin','系统管理权限');
+insert into perms(id,name,memo) values (2,'default','默认权限');
+
+-- 角色表，角色是权限的集合
+DROP TABLE `roles`;
+CREATE TABLE IF NOT EXISTS `roles` (
+	id bigint(20) not null primary key,
+    name varchar(128) not null unique COMMENT '角色名称',
+    info varchar(128) COMMENT '角色描述',
+	ctime int(11) unsigned,
+	utime int(11) unsigned
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+insert into roles(id,name,info,ctime,utime) values (1,'admin', '系统管理员', now(), now());
+
+-- 角色和权限的对应关系表
+DROP TABLE `role_perm`;
+CREATE TABLE IF NOT EXISTS `role_perm` (
+	id bigint(20) not null primary key,
+	permid bigint(20) not null,
+	roleid bigint(20) not null
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
+-- 用户和权限、角色的关系表
+-- 用户既可以对应角色，也可以对应权限。实际处理会拿到角色对应的所有权限，和直接分配的权限合并在一起
+DROP TABLE user_perm;
+CREATE TABLE IF NOT EXISTS user_perm (
+	id bigint(20) not null primary key,
+	userid bigint(20) not null,
+	permid bigint(20) not null default 0 COMMENT '权限id，为0表示无权限',
+	roleid bigint(20) not null default 0 COMMENT '角色id，为0表示无角色',
+	ctime int(11) unsigned,
+	utime int(11) unsigned
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+
 
 
