@@ -173,11 +173,26 @@ def perm():
     url = prefix_url + '/user/q'
     request(url, 'GET')
 
+def admin():
+    prefix_url = 'http://127.0.0.1:6300/v1'
+    xid = 13
+
+    url = prefix_url + '/user/login?password=123456&username=zhaowei%d' % (xid)
+    obj = request(url, 'GET')
+
+    url = prefix_url + '/user/q'
+    request(url, 'GET')
+    
+    url = prefix_url + '/user/list'
+    request(url, 'GET')
+
 
 
 
 if __name__ == '__main__':
     #main()
-    group()
+    #group()
+    admin()
+
 
 

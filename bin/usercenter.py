@@ -200,12 +200,13 @@ class UserBase (BaseHandler):
 
         return self.succ(user)
 
+    @with_validator([F('page',T_INT,default=1), F('pagesize',T_INT,default=20)])
     def get_user_list(self):
         if not self.ses.get('isadmin', 0):
             return self.fail(ERR_PERM, 'permission deny')
             
-        data = self.input()
-        pagecur  = int(data.get('pagecur', 1))
+        data = self.data
+        pagecur  = int(data.get('page', 1))
         pagesize = int(data.get('pagesize', 20))
 
         page = None
