@@ -48,8 +48,6 @@ CREATE TABLE IF NOT EXISTS groups (
 	utime int(11) unsigned
 )ENGINE=InnoDB DEFAULT CHARSET=utf8; 
 
-insert into groups(id,name,userid,perm,ctime,utime) values (1,'admin',1,1,UNIX_TIMESTAMP(now()),UNIX_TIMESTAMP(now()));
-
 -- 用户和组的关系
 DROP TABLE user_group;
 CREATE TABLE IF NOT EXISTS user_group (
@@ -71,7 +69,6 @@ CREATE TABLE IF NOT EXISTS settings (
 	value varchar(512) not null,
 	ctime int(11) unsigned,
 	utime int(11) unsigned,
-	key (userid),
 	key (name)
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
@@ -105,8 +102,8 @@ CREATE TABLE IF NOT EXISTS `perms` (
 	utime int(11) unsigned
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-insert into perms(id,name,memo) values (1,'sysadmin','系统管理权限');
-insert into perms(id,name,memo) values (2,'default','默认权限');
+insert into perms(id,name,info) values (1,'sysadmin','系统管理权限');
+insert into perms(id,name,info) values (2,'default','默认权限');
 
 -- 角色表，角色是权限的集合
 DROP TABLE `roles`;

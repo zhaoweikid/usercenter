@@ -10,4 +10,7 @@ urls = (
     ('^/v1/perm/(add|del|mod|q|list)$', "perms.Perm"),
     # 角色管理
     ('^/v1/role/(add|del|mod|q|list)$', "perms.Role"),
+    # 管理员功能
+    ('^/v1/admin/(userlist)$', "admin.Admin"),
+
 )

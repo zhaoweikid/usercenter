@@ -3,7 +3,7 @@ import os, sys
 import json, random, hashlib
 import time
 import copy
-from zbase3.web import core
+from zbase3.web import core, cache
 from zbase3.web.validator import *
 from zbase3.base.dbpool import get_connection
 from zbase3.utils import createid
@@ -83,7 +83,7 @@ class UserBase (BaseHandler):
             sesdata = {'userid':ret['id'], 'username':ret['username'], 'isadmin':ret['isadmin']}
             self.ses.update(sesdata)
 
-            self.succ({'userid':ret['id']})
+            self.succ({'userid':str(ret['id']), 'username':ret['username']})
         except Exception as e:
             log.error(traceback.format_exc())
             return self.fail(ERR, 'Exception:' + str(e))
@@ -148,7 +148,7 @@ class UserBase (BaseHandler):
         user = None
         groups = None
         with get_connection(self.dbname) as conn:
-            user = conn.select_one(self.table, where)
+            user = conn.select_one(self.table, where, fields='id,username,password,email,mobile,head,score,stage,FROM_UNIXTIME(ctime) as ctime,FROM_UNIXTIME(utime) as utime,logtime,regip,status,isadmin,extend')
             if not user:
                 return self.fail(ERR_USER, 'not have user info')
 
@@ -170,7 +170,7 @@ class UserBase (BaseHandler):
                         user['role'] = ret
 
                 if perms:
-                    ret = conn.select('perms', where={'id':('in', perms), fields='id,name'}
+                    ret = conn.select('perms', where={'id':('in', perms)}, fields='id,name')
                     if ret:
                         user['perm'] = ret
                         user['allperm'] = ret
@@ -218,40 +218,42 @@ class UserBase (BaseHandler):
                 row['extend'] = json.loads(row['extend'])
 
         pagedata = {
-            'cur':page.page, 
-            'size':page.page_size, 
-            'count':page.count, 
-            'pages':page.pages, 
+            'page':page.page, 
+            'pagesize':page.page_size, 
+            'pagenum':page.pages, 
             'data':pdata,
         }
         return self.succ(pagedata)
 
     @with_validator([F('username'), 
                      F('password'), 
+                     F('status', T_INT), 
                      F('extend'),
                      F('id', T_INT),
     ]) 
     def modify_user(self):
         # modify username/status/password/extend
-        #userid = int(userid)
         #isadmin = self.ses['isadmin']
         userid = self.ses['userid']
-
-        #if not isadmin and userid != suid:
-        #    return self.fail(ERR_PERM)
 
         data = self.validator.data
         values = {}
         where  = {'id':userid}
        
         for k in ['username', 'password', 'extend']:
-            if k == 'password' and data.get('password'):
-                values['password'] = create_password(data['password'])
-            elif k == 'extend' and data.get('extend'):
-                x = json.loads(data.get('extend'))
-                values['extend'] = data['extend']
-            elif data[k]:
-                values[k] = data[k]
+            v = data.get(k)
+            if k == 'password' and v:
+                values['password'] = create_password(v)
+            elif k == 'extend' and v:
+                x = json.loads(v)
+                values['extend'] = v
+            elif v:
+                values[k] = v
+
+        log.debug('update values:%s', values)
+        if not values:
+            log.info('no modify info')
+            return self.fail(ERR_PARAM)
 
         values['utime'] = int(time.time())
 
@@ -274,14 +276,14 @@ class UserBase (BaseHandler):
                 'id': createid.new_id64(conn=conn),
                 'userid':self.ses['userid'],
                 'groupid':groupid,
-                'ctime':t),
+                'ctime':t,
                 'utime':t,
             }
             ret = conn.insert('user_group', data)
             if ret != 1:
                 return self.fail(ERR_DB)
 
-            ret = conn.select_one('user_group', where={'id':data['id']}
+            ret = conn.select_one('user_group', where={'id':data['id']})
             return succ(ret)
 
 
@@ -307,7 +309,7 @@ class UserBase (BaseHandler):
                 'userid':self.ses['userid'],
                 'roleid':0,
                 'permid':0,
-                'ctime':t),
+                'ctime':t,
                 'utime':t,
             }
             if roleid:
@@ -319,7 +321,7 @@ class UserBase (BaseHandler):
             if ret != 1:
                 return self.fail(ERR_DB)
 
-            ret = conn.select_one('user_perm', where={'id':data['id']}
+            ret = conn.select_one('user_perm', where={'id':data['id']})
             return succ(ret)
 
 
@@ -341,12 +343,11 @@ class UserBase (BaseHandler):
 
 class User (UserBase):
     noses_path = {
-        '/v1/user':'POST', 
+        '/v1/user/signup':'POST', 
         '/v1/user/login':'GET',
     }
 
     def GET(self, name=None):
-        # select
         try:
             if name == 'login':  # /login
                 return self.login()
@@ -359,6 +360,7 @@ class User (UserBase):
             elif name == 'list':
                 return self.get_user_list()
         except:
+            log.error(traceback.format_exc())
             self.fail(ERR_PARAM)
 
     def POST(self, name):
@@ -377,6 +379,7 @@ class User (UserBase):
                 return self.del_perm_role()
 
         except:
+            log.error(traceback.format_exc())
             self.fail(ERR_PARAM)
 
 

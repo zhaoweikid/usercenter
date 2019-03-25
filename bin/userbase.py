@@ -2,6 +2,7 @@
 import os, sys
 import random, hashlib
 from zbase3.web import core, advance
+from zbase3.web.validator import *
 import config
 import json
 import logging
@@ -97,7 +98,7 @@ class BaseObjectHandler (BaseHandler):
             return ret
 
 
-    def delete(self. xid):
+    def delete(self, xid):
         with get_connection(self.db) as conn:
             ret = conn.delete(self.table, where={'id':xid})
             return ret
