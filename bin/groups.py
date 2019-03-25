@@ -14,40 +14,11 @@ class Group (BaseObjectHandler):
     dbname = 'usercenter'
     table = 'groups'
 
-    def GET(self, name):
-        try:
-            ret = None
-            if name == 'q':
-                ret = self.get_arg()
-            elif name == 'list':
-                ret = self.get_list_arg()
-            else:
-                self.fail(ERR_PARAM, 'url %s not found' % (name))
-                return
-
-            self.succ(ret)
-        except Exception as e:
-            self.fail(ERR_ACTION, str(e))
-
-    
-    def POST(self, name):
-        try:
-            data = self.validator.data
-            ret = None
-            if name == 'add':
-                ret = self.insert(data)
-            elif name == 'mod':
-                data2 = copy.copy(data)
-                data2.pop('id')
-                ret = self.update(int(data['id']), data2)
-            elif name == 'del':
-                ret = self.delete(int(data['id']))
-            else:
-                self.fail(ERR_PARAM, 'url %s not found' % (name))
-                return
-
-            self.succ(ret)
-        except Exception as e:
-            self.fail(ERR_ACTION, str(e))
-
+    @with_validator([F('name'), F('info'), F('parentid', T_INT)])
+    def insert(self):
+        return BaseObjectHandler.insert(self)
+ 
+    @with_validator([F('id', T_INT), F('info'), F('name'), F('parentid', T_INT)])
+    def update(self):
+        return BaseObjectHandler.update(self)
  

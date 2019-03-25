@@ -56,7 +56,7 @@ def request(url, method, values=None):
 
 
 
-def main():
+def user():
     prefix_url = 'http://127.0.0.1:6300/v1'
     xid = 13
 
@@ -78,8 +78,57 @@ def main():
     url = prefix_url + '/user/q?id=%d' % (int(obj['data']['userid']))
     request(url, 'GET')
  
-
 def group():
+    prefix_url = 'http://127.0.0.1:6300/v1'
+    xid = 13
+
+    url = prefix_url + '/user/login?password=123456&username=zhaowei%d' % (xid)
+    obj = request(url, 'GET')
+
+    url = prefix_url + '/user/q?id=%d' % (int(obj['data']['userid']))
+    request(url, 'GET')
+    
+    url = prefix_url + '/group/list'
+    request(url, 'GET')
+
+    url = prefix_url + '/user/q'
+    request(url, 'GET')
+
+    url = prefix_url + '/group/add?parentid=0&name=group1&info=info1'
+    request(url, 'POST')
+
+    url = prefix_url + '/group/list'
+    obj = request(url, 'GET')
+
+    groupid =  obj['data']['data'][0]['id']
+    url = prefix_url + '/group/q?id=' + groupid
+    obj = request(url, 'GET')
+
+    url = prefix_url + '/group/mod?info=info100&id=' + groupid
+    obj = request(url, 'POST')
+
+    url = prefix_url + '/group/q?id=' + groupid
+    obj = request(url, 'GET')
+
+    url = prefix_url + '/user/q'
+    request(url, 'GET')
+
+    url = prefix_url + '/user/addgroup?groupid=' + groupid
+    request(url, 'POST')
+
+    url = prefix_url + '/user/q'
+    request(url, 'GET')
+
+    url = prefix_url + '/user/delgroup?groupid=' + groupid
+    request(url, 'POST')
+
+    url = prefix_url + '/user/q'
+    request(url, 'GET')
+
+
+
+ 
+def perm():
     prefix_url = 'http://127.0.0.1:6300/v1'
     xid = 13
 

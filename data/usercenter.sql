@@ -43,7 +43,8 @@ DROP TABLE groups;
 CREATE TABLE IF NOT EXISTS groups (
 	id bigint(20) not null primary key,
 	parentid bigint(20) not null COMMENT '上级组',
-	name varchar(128) not null unique,
+	name varchar(128) not null unique COMMENT '组名',
+    info varchar(128) COMMENT '组描述',
 	ctime int(11) unsigned,
 	utime int(11) unsigned
 )ENGINE=InnoDB DEFAULT CHARSET=utf8; 
