@@ -83,7 +83,7 @@ insert into settings(id,name,value,ctime,utime) values (4, 'pwd_lock_time', '10'
 
 -- 用户登录记录
 DROP TABLE `login_record`;
-CREATE TABLE IF NOT EXISTS `perm` (
+CREATE TABLE IF NOT EXISTS `login_record` (
 	id bigint(20) not null primary key,
 	userid bigint(20) not null,
 	action varchar(128) not null,
@@ -102,8 +102,8 @@ CREATE TABLE IF NOT EXISTS `perms` (
 	utime int(11) unsigned
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-insert into perms(id,name,info) values (1,'sysadmin','系统管理权限');
-insert into perms(id,name,info) values (2,'default','默认权限');
+insert into perms(id,name,info) values (1,'perm_view','权限查看');
+insert into perms(id,name,info) values (2,'perm_mod','权限增加修改');
 
 -- 角色表，角色是权限的集合
 DROP TABLE `roles`;
@@ -122,7 +122,9 @@ DROP TABLE `role_perm`;
 CREATE TABLE IF NOT EXISTS `role_perm` (
 	id bigint(20) not null primary key,
 	permid bigint(20) not null,
-	roleid bigint(20) not null
+	roleid bigint(20) not null,
+	ctime int(11) unsigned,
+	utime int(11) unsigned
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- 用户和权限、角色的关系表

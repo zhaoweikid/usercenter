@@ -3,6 +3,7 @@ import os, sys
 import json
 import urllib
 import urllib.request
+import pprint
 
 class MyRequest (urllib.request.Request):
     method = 'GET'
@@ -20,7 +21,7 @@ def request(url, method, values=None):
   
     data = None
     if values:
-        data = urllib.urlencode(values)
+        data = urllib.parse.urlencode(values)
     headers = {
         'User-Agent': 'testclient',
         #'Cookie': 'sid=%d'
@@ -49,6 +50,7 @@ def request(url, method, values=None):
         s = resp.read()
         print(s)
         ret = json.loads(s)
+        pprint.pprint(ret)
 
     return ret
 
@@ -77,7 +79,56 @@ def main():
     request(url, 'GET')
  
 
+def group():
+    prefix_url = 'http://127.0.0.1:6300/v1'
+    xid = 13
+
+    url = prefix_url + '/user/login?password=123456&username=zhaowei%d' % (xid)
+    obj = request(url, 'GET')
+
+    userid = obj['data']['userid']
+
+    url = prefix_url + '/user/q?id=%d' % (int(obj['data']['userid']))
+    request(url, 'GET')
+ 
+    url = prefix_url + '/perm/list'
+    obj = request(url, 'GET')
+
+    url = prefix_url + '/perm/q?id=%s' % (obj['data']['data'][-1]['id'])
+    obj = request(url, 'GET')
+
+    #url = prefix_url + '/perm/add?name=test_view&info=%s' % (urllib.parse.quote('测试查看'))
+    #obj = request(url, 'POST')
+
+    permid = obj['data']['id']
+    url = prefix_url + '/perm/mod?id=%s&info=testview2' % (permid)
+    obj = request(url, 'POST')
+
+    url = prefix_url + '/perm/list'
+    obj = request(url, 'GET')
+
+    #url = prefix_url + '/perm/del?id=%s' % (permid)
+    #obj = request(url, 'POST')
+    #url = prefix_url + '/perm/list'
+    #obj = request(url, 'GET')
+    
+    url = prefix_url + '/role/add?name=%s&info=test1'  % ('role1')
+    obj = request(url, 'POST')
+
+    url = prefix_url + '/role/list'
+    obj = request(url, 'GET')
+
+    url = prefix_url + '/user/addperm?roleid=6515860480953707676' 
+    obj = request(url, 'POST')
+
+    url = prefix_url + '/user/q'
+    request(url, 'GET')
+
+
+
 
 if __name__ == '__main__':
-    main()
+    #main()
+    group()
+
 

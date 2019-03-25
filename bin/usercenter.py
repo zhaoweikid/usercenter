@@ -133,7 +133,7 @@ class UserBase (BaseHandler):
                 conn.insert(self.table, insertdata)
             
             self.create_session()
-            sesdata = {'userid':insertdata['id'], 'username':username, 'isadmin':0}
+            sesdata = {'userid':int(insertdata['id']), 'username':username, 'isadmin':0}
             self.ses.update(sesdata)
 
             resp = self.succ({'userid':str(insertdata['id']), 'username':username, 'email':email, 'mobile':mobile})
@@ -143,12 +143,13 @@ class UserBase (BaseHandler):
             return self.fail(ERR, 'error:' + str(e))
 
     def get_user(self):
-        userid = self.ses['userid']
+        userid = int(self.ses['userid'])
         where = {'id':userid}
         user = None
         groups = None
+        fields ='id,username,password,email,mobile,head,score,stage,FROM_UNIXTIME(ctime) as ctime,FROM_UNIXTIME(utime) as utime,logtime,regip,status,isadmin,extend'
         with get_connection(self.dbname) as conn:
-            user = conn.select_one(self.table, where, fields='id,username,password,email,mobile,head,score,stage,FROM_UNIXTIME(ctime) as ctime,FROM_UNIXTIME(utime) as utime,logtime,regip,status,isadmin,extend')
+            user = conn.select_one(self.table, where, fields=fields)
             if not user:
                 return self.fail(ERR_USER, 'not have user info')
 
@@ -176,7 +177,7 @@ class UserBase (BaseHandler):
                         user['allperm'] = ret
 
                 if roles:
-                    ret = conn.query('select p.id as id,p.name as name from perm p, role_perm rp where rp in (%s) and rp.permid=p.id' % \
+                    ret = conn.query('select p.id as id,p.name as name from perms p, role_perm rp where rp.roleid in (%s) and rp.permid=p.id' % \
                         (conn.exp2sql('rp.roleid', 'in', roles)))
                     if ret:
                         xids = [x['id'] for x in user['allperm']]
@@ -184,6 +185,9 @@ class UserBase (BaseHandler):
                             if row['id'] not in xids:
                                 user['allperm'].append(row)
 
+
+            allperm = [ x['name'] for x in user['allperm'] ]
+            self.ses['allperm'] = allperm
 
         for k in ['password', 'regip', 'isadmin']:
             user.pop(k)
@@ -297,6 +301,7 @@ class UserBase (BaseHandler):
             ret = conn.delete('user_group', where={'userid':userid, 'groupid':groupid})
             return self.succ(ret)
 
+    @with_validator([F('permid', T_INT, default=0), F('roleid', T_INT, default=0)])
     def add_perm_role(self):
         data = self.validator.data
         roleid = data.get('roleid')
@@ -322,10 +327,10 @@ class UserBase (BaseHandler):
                 return self.fail(ERR_DB)
 
             ret = conn.select_one('user_perm', where={'id':data['id']})
-            return succ(ret)
+            return self.succ(ret)
 
 
-    @with_validator([F('groupid', T_INT)])
+    @with_validator([F('permid', T_INT, default=0), F('roleid', T_INT, default=0)])
     def del_perm_role(self):
         data = self.validator.data
         roleid = data.get('roleid')
@@ -348,6 +353,7 @@ class User (UserBase):
     }
 
     def GET(self, name=None):
+        log.warn('====== GET %s %s ======', self.req.path, self.req.query_string)
         try:
             if name == 'login':  # /login
                 return self.login()
@@ -364,6 +370,7 @@ class User (UserBase):
             self.fail(ERR_PARAM)
 
     def POST(self, name):
+        log.warn('====== POST %s %s ======', self.req.path, self.req.query_string)
         try:
             if name == 'signup':
                 return self.register()
