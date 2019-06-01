@@ -8,7 +8,7 @@ from webconfig import *
 HOST = '0.0.0.0'
 
 # 服务端口
-PORT = 6300
+PORT = 6101
 
 # 调试模式: True/False
 # 生产环境必须为False
@@ -21,12 +21,22 @@ LOGFILE = os.path.join(HOME, '../log/usercenter.log')
 DATABASE = {
     'usercenter': {
         'engine':'pymysql',
-        'db': 'usercenter',
+        'db': 'elec_usercenter',
         'host': '127.0.0.1',
         'port': 3306,
-        'user': 'zhaowei',
-        'passwd': '654321',
+        'user': 'root',
+        'passwd': 'KORpVLvYHiIOmrD4',
         'charset': 'utf8',
         'conn': 10,
     },
 }
+
+OPENUSER_ACCOUNT = {
+    'wx27edcac7e40b6688':
+        {
+        'appid':'wx27edcac7e40b6688',
+        'secret':'475c663232ab60adf2f9882eb4bf3b3b',
+        'plat':'wxmicro',
+        }
+}
+

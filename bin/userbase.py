@@ -38,10 +38,26 @@ errstr = {
 }
 
 
+# 未认证
+STATUS_NOAUTH = 1
+# 正常
+STATUS_OK  = 2
+# 封禁
+STATUS_BAN = 3
+# 删除
+STATUS_DEL = 4
+
+
 def check_perm(perms):
     def f(func):
         def _(self, *args, **kwargs):
-            allperms = set(self.ses['allperm'])
+            if self.ses.get('isadmin', 0):
+                return func(self, *args, **kwargs)
+
+            p = self.ses.get('allperm')
+            if not p:
+                return self.fail(ERR_PERM)
+            allperms = set(p)
             s = set(perms) 
             if not s.issubset(allperms):
                 return self.fail(ERR_PERM)
@@ -99,8 +115,9 @@ class BaseObjectHandler (BaseHandler):
 
     def _convert_data(self, data):
         def _convert_row(row):
-            if 'id' in row:
-                row['id'] = str(row['id'])
+            for k in ['id', 'userid', 'groupid', 'roleid', 'permid', 'parentid']:
+                if k in row:
+                    row[k] = str(row[k])
 
             for k in ['ctime','utime']:
                 t = row.get(k)
@@ -117,9 +134,7 @@ class BaseObjectHandler (BaseHandler):
 
     @with_validator([F('id',T_INT)])
     def get_arg(self):
-        data = self.validator.data
-
-        return self.get(data['id'])
+        return self.get(self.data['id'])
  
     def get(self, xid):
         with get_connection(self.dbname) as conn:
@@ -129,16 +144,29 @@ class BaseObjectHandler (BaseHandler):
             return OK, ret
 
 
-    @with_validator([F('page',T_INT,default=1), F('pagesize',T_INT,default=20)])
+    #@with_validator([F('page',T_INT,default=1), F('pagesize',T_INT,default=20)])
+    # 必须自己定义装饰器来限制参数
     def get_list_arg(self):
-        data = self.validator.data
-        return self.get_list(data['page'], data['pagesize'])
+        where = {}
+        for k in self.data:
+            if k in ['page', 'pagesize']:
+                continue
+            v = self.data.get(k)
+            if not v:
+                continue
+            if isinstance(v, (list,tuple)):
+                where[k] = ('in', v)
+            else:
+                where[k] = v
+
+        return self.get_list(self.data['page'], self.data['pagesize'], where)
+ 
     
-    def get_list(self, page, pagesize):
+    def get_list(self, page, pagesize, where=None):
         log.debug('list page:%s pagesize:%s', str(page), str(pagesize))
         retdata = {'page':page, 'pagesize':pagesize, 'pagenum':0}
         with get_connection(self.dbname) as conn:
-            sql = conn.select_sql(self.table)
+            sql = conn.select_sql(self.table, where=where)
             ret = conn.select_page(sql, page, pagesize)
             if ret.pagedata.data:
                 self._convert_data(ret.pagedata.data)
@@ -161,14 +189,19 @@ class BaseObjectHandler (BaseHandler):
                 data['id'] = createid.new_id64(conn=conn)
 
             ret = conn.insert(self.table, data)
-            return OK, ret
+            if ret == 1:
+                return OK, {'id':str(data['id'])}
+            else:
+                return ERR_DATA, 'insert error'
 
     def update(self):
         xid = self.data.get('id')
+        log.debug('xid:%s', xid)
+
         data = copy.copy(self.data)
         data.pop('id')
         
-        log.debug('data:%s', data)
+        log.debug('data:%s', self.data)
         if not data:
             return ERR_PARAM, 'param error'
 
@@ -179,9 +212,18 @@ class BaseObjectHandler (BaseHandler):
         for k in delks:
             data.pop(k)
 
+        if isinstance(xid, (list, tuple)):
+            xid = ('in', xid)
+
         with get_connection(self.dbname) as conn:
             ret = conn.update(self.table, data, where={'id':xid})
-            return OK, ret
+            if ret >= 1:
+                data['_rows'] = ret
+                if not isinstance(xid, (list, tuple)):
+                    data['id'] = str(xid)
+                return OK, data
+            else:
+                return ERR_DATA, 'update error'
 
     @with_validator([F('id', T_INT)])
     def delete(self):
@@ -199,6 +241,8 @@ class BaseObjectHandler (BaseHandler):
                 code, ret = self.get_arg()
             elif name == 'list':
                 code, ret = self.get_list_arg()
+            elif hasattr(self, name):
+                code, ret = getattr(self, name)()
             else:
                 self.fail(ERR_PARAM, 'url %s not found' % (name))
                 return
@@ -223,6 +267,8 @@ class BaseObjectHandler (BaseHandler):
                 code, ret = self.update()
             elif name == 'del':
                 code, ret = self.delete()
+            elif hasattr(self, name):
+                code, ret = getattr(self, name)()
             else:
                 self.fail(ERR_PARAM, 'url %s not found' % (name))
                 return

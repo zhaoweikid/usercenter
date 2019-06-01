@@ -7,20 +7,21 @@ SET NAMES utf8;
 DROP TABLE users;
 CREATE TABLE IF NOT EXISTS users (
 	id bigint not null primary key,
-	username varchar(128) not null unique,
-	password varchar(64) not null,
-    email varchar(128) unique,
-	mobile varchar(18) unique,
-	head varchar(128) not null default '', -- head url or path
-	score int(11) not null default 0, -- 积分
-	stage int(11) not null default 1, -- 等级
-	ctime int(11) unsigned, -- 创建时间
-	utime int(11) unsigned, -- 更新时间
-	logtime int(11) unsigned, -- 最后一次登陆时间
-	regip varchar(128) not null default '',
-	status tinyint default 0, -- 1未验证 2正常 3封禁 4删除
-	isadmin tinyint default 0, -- 1admin 0user
-	extend varchar(8192),
+	username varchar(128) not null unique COMMENT '用户名',
+	password varchar(64) not null COMMENT '密码',
+	usertype tinyint default 1 COMMENT '用户类型',
+    email varchar(128) unique COMMENT '邮件地址',
+	mobile varchar(18) unique COMMENT '手机号',
+	head varchar(128) not null default '' COMMENT '头像url',
+	score int(11) not null default 0 COMMENT '积分',
+	stage int(11) not null default 1 COMMENT '等级',
+	ctime int(11) unsigned COMMENT '创建时间',
+	utime int(11) unsigned COMMENT '更新时间',
+	logtime int(11) unsigned COMMENT '最后一次登录时间',
+	regip varchar(128) not null default '' COMMENT '注册ip',
+	status tinyint default 0 COMMENT '状态: 1.注册未验证 2.正常 3.封禁 4.删除',
+	isadmin tinyint default 0 COMMENT '是否为超级管理员 1是 0否',
+	extend varchar(8192) COMMENT '扩展字段，存储json数据',
 	key (username, email, mobile)
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
 insert into users(id,username,password,ctime,status,isadmin) values (1,'admin','sha1$123456$71dd07494c5ee54992a27746d547e25dee01bd97',UNIX_TIMESTAMP(now()),2,1);
@@ -30,7 +31,7 @@ DROP TABLE openuser;
 CREATE TABLE IF NOT EXISTS openuser (
 	id bigint(20) not null primary key,
 	userid bigint(20) not null,
-	outplat varchar(128) not null COMMENT '第三方系统名称，支持：wx/alipay/qq/taobao 等',
+	plat varchar(128) not null COMMENT '第三方系统名称，支持：wx/wxmicro/alipay/qq/taobao 等',
 	appid varchar(128) not null default '' COMMENT '第三方系统账号',
 	openid varchar(128) not null default '' COMMENT '第三方系统识别的用户id',
 	ctime int(11) unsigned,
@@ -66,8 +67,8 @@ insert into user_group(id,userid,groupid,ctime) values (1,1,1,UNIX_TIMESTAMP(now
 DROP TABLE settings;
 CREATE TABLE IF NOT EXISTS settings (
 	id bigint(20) not null primary key,
-	name varchar(128) not null,
-	value varchar(512) not null,
+	name varchar(128) not null COMMENT '设置项名称',
+	value varchar(512) not null COMMENT '设置项的值',
 	ctime int(11) unsigned,
 	utime int(11) unsigned,
 	key (name)
@@ -87,7 +88,7 @@ DROP TABLE `login_record`;
 CREATE TABLE IF NOT EXISTS `login_record` (
 	id bigint(20) not null primary key,
 	userid bigint(20) not null,
-	action varchar(128) not null,
+	action varchar(128) not null COMMENT '操作，目前可以为 login/logout',
 	state smallint not null default 1 COMMENT '登录结果，1.成功 0.失败',
 	memo varchar(512) COMMENT '其他信息',
 	ctime int(11) unsigned
@@ -125,7 +126,8 @@ CREATE TABLE IF NOT EXISTS `role_perm` (
 	permid bigint(20) not null,
 	roleid bigint(20) not null,
 	ctime int(11) unsigned,
-	utime int(11) unsigned
+	utime int(11) unsigned,
+	UNIQUE KEY `rp_uniq_id` (`permid`, `roleid`)
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- 用户和权限、角色的关系表

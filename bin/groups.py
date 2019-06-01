@@ -21,4 +21,13 @@ class Group (BaseObjectHandler):
     @with_validator([F('id', T_INT), F('info'), F('name'), F('parentid', T_INT)])
     def update(self):
         return BaseObjectHandler.update(self)
+
+    @with_validator([
+        F('page',T_INT,default=1), 
+        F('pagesize',T_INT,default=20),
+        F('name'), 
+        F('ctime', T_DATETIME), 
+    ])
+    def get_list_arg(self):
+        return BaseObjectHandler.get_list_arg(self)
  

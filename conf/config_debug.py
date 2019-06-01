@@ -8,7 +8,7 @@ from webconfig import *
 HOST = '0.0.0.0'
 
 # 服务端口
-PORT = 6300
+PORT = 6101
 
 # 调试模式: True/False
 # 生产环境必须为False
@@ -24,11 +24,22 @@ DATABASE = {
         'db': 'usercenter',
         'host': '127.0.0.1',
         'port': 3306,
-        'user': 'zhaowei',
+        'user': 'root',
+        #'passwd': 'KORpVLvYHiIOmrD4',
         'passwd': '123456',
         'charset': 'utf8',
-        'conn': 10,
+        'conn': 3,
     },
+
+}
+
+OPENUSER_ACCOUNT = {
+    'wx27edcac7e40b6688':
+        {
+        'appid':'wx27edcac7e40b6688',
+        'secret':'475c663232ab60adf2f9882eb4bf3b3b',
+        'plat':'wxmicro',
+        }
 }
 
 

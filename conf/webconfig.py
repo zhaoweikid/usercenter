@@ -40,8 +40,9 @@ CHARSET = 'UTF-8'
 #SESSION = {'store':'DiskSessionStore', 'expire':30, 'path':'/tmp'}
 
 SESSION = { 
-    'type':'SessionRedis', 
+    'store':'SessionRedis', 
     'server':[{'addr':('127.0.0.1', 6379), 'timeout':1000}], 
     'expire':3600,
+    'db':0,
 }
 
