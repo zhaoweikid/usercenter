@@ -34,11 +34,11 @@ DATABASE = {
 
 OPENUSER_ACCOUNT = {
     'wx27edcac7e40b6688':
-        {
+    {
         'appid':'wx27edcac7e40b6688',
         'secret':'',
         'plat':'wxmicro',
-        }
+    }
 }
 
 

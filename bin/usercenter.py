@@ -756,20 +756,6 @@ class UserBase (BaseHandler):
     @with_validator([
         F(name='userid', valtype=T_INT, must=True)
     ])
-    def _get_user(self):
-        data = self.validator.data
-        user_id = data['userid']
-        return self.get_user_other(user_id=user_id)
-
-    def get_user_other(self, user_id):
-        with get_connection(self.dbname) as conn:
-            ret = conn.select_one(table=self.table, where={'id': user_id})
-            if ret:
-                ret.pop('password')
-                return self.succ(data=ret)
-            else:
-                return self.fail(ERR)
-
 
 class User (UserBase):
     session_nocheck = [
@@ -778,7 +764,6 @@ class User (UserBase):
         '/uc/v1/user/login',
         '/uc/v1/user/login3rd',
         '/uc/v1/user/login_reg_3rd',
-        '/uc/v1/user/get_user',
     ]
 
     def GET(self, name=None):
@@ -796,8 +781,6 @@ class User (UserBase):
                 return self.get_user_arg()
             elif name == 'list':
                 return self.get_user_list()
-            elif name == 'get_user':
-                return self._get_user()
             else:
                 return httpcore.NotFound()
         except:

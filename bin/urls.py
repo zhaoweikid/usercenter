@@ -3,7 +3,7 @@
 urls = (
     ('^/uc/v1/ping', "usercenter.Ping"),
     # 用户管理
-    ('^/uc/v1/user/(login|login3rd|login_reg_3rd|logout|q|list|signup|signup3rd|mod|addgroup|delgroup|addperm|delperm|get_user)$', "usercenter.User"),
+    ('^/uc/v1/user/(login|login3rd|login_reg_3rd|logout|q|list|signup|signup3rd|mod|addgroup|delgroup|addperm|delperm)$', "usercenter.User"),
     # 用户组管理
     ('^/uc/v1/group/(add|del|mod|q|list)$', "groups.Group"),
     # 权限管理
