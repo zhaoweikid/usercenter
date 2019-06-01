@@ -21,11 +21,11 @@ LOGFILE = os.path.join(HOME, '../log/usercenter.log')
 DATABASE = {
     'usercenter': {
         'engine':'pymysql',
-        'db': 'elec_usercenter',
+        'db': 'usercenter',
         'host': '127.0.0.1',
         'port': 3306,
         'user': 'root',
-        'passwd': 'KORpVLvYHiIOmrD4',
+        'passwd': '123456',
         'charset': 'utf8',
         'conn': 10,
     },
@@ -35,7 +35,7 @@ OPENUSER_ACCOUNT = {
     'wx27edcac7e40b6688':
         {
         'appid':'wx27edcac7e40b6688',
-        'secret':'475c663232ab60adf2f9882eb4bf3b3b',
+        'secret':'',
         'plat':'wxmicro',
         }
 }
