@@ -1,13 +1,15 @@
 # coding: utf-8
 import os, sys
-HOME = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(os.path.dirname(os.path.dirname(HOME)), 'conf'))
+CWD = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.dirname(CWD))
+sys.path.append(os.path.join(os.path.dirname(os.path.dirname(CWD)), 'conf'))
 import json
 import urllib
 import urllib.request
 import pprint
 from zbase3.base import dbpool, logger
 import config_debug
+import config
 import createpass
 import datetime, time
 import urllib
@@ -16,8 +18,14 @@ import urllib.parse
 log = logger.install('stdout')
 dbpool.install(config_debug.DATABASE)
 
-#SERVER = '127.0.0.1:6100'
-SERVER = '127.0.0.1:6101'
+
+SERVER = '%s:%d' % (config.HOST, config.PORT) 
+try:
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM, 0)
+    s.connect((config.HOST, config.PORT))
+except:
+    SERVER = '%s:%d' % (config_debug.HOST, config_debug.PORT)
 
 class MyRequest (urllib.request.Request):
     method = 'GET'
@@ -65,7 +73,8 @@ def request(url, method, values=None):
         s = resp.read()
         print(s)
         ret = json.loads(s)
-        pprint.pprint(ret)
+        #pprint.pprint(ret)
+        print(json.dumps(ret, indent=2))
 
     return ret
 
@@ -576,21 +585,23 @@ def test_perm():
 
 def test_simple():
     global u
-
+    
+    #u.create()
+    
     u.login()
-    u.q()
+    #u.q()
     #u.list()
 
-    r = Role()
-    ret = r.list()
-    roleid = ret['data']['data'][0]['id']
-    r.q(roleid)    
+    #r = Role()
+    #ret = r.list()
+    #roleid = ret['data']['data'][0]['id']
+    #r.q(roleid)    
 
-    r.addperm(id=roleid, permid=6531811927155317021)
-    ret = r.q(roleid)    
+    #r.addperm(id=roleid, permid=6531811927155317021)
+    #ret = r.q(roleid)    
 
     #rolepermid= ret['data']['perm'][-1]['id']
-    r.delperm(id=roleid, permid=6531811927155317021)
+    #r.delperm(id=roleid, permid=6531811927155317021)
 
     #u2 = User('18800001111', 8888)
     #u2.clear()

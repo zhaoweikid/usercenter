@@ -92,9 +92,6 @@ class UserBase (BaseHandler):
                 conn.update(self.table, {'logtime':int(time.time())}, where={'id':ret['id']})
 
                 retcode, userinfo = self.get_user(ret['id'])
-                video_user = conn.select_one(table='video_users', where={'userid': ret['id'], 'platform': 'huanxin'})
-                if video_user:
-                    userinfo['video_user'] = {'userid': video_user['video_userid'], 'passwd': video_user['video_passwd']}
 
             sesdata = {
                 'userid':ret['id'], 
@@ -753,9 +750,6 @@ class UserBase (BaseHandler):
             ret = conn.delete('user_perm', where=where)
             return self.succ()
 
-    @with_validator([
-        F(name='userid', valtype=T_INT, must=True)
-    ])
 
 class User (UserBase):
     session_nocheck = [
