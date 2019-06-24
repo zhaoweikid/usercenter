@@ -95,24 +95,43 @@ class BaseHandler (advance.APIHandler):
 
     def GET(self, name):
         log.warn('====== GET %s %s ======', self.req.path, self.req.query_string)
+        if name != 'query':
+            return httpcore.NotFound()
+
         try:
-            func = getattr(self, name)
-            return func()
+            code, ret = self.query()
+
+            if code == OK:
+                return self.succ(ret)
+            else:
+                return self.fail(code, ret)
         except:
             log.error(traceback.format_exc())
             return self.fail(ERR_INTERNAL)
 
-    def POST(self, name):
+    def POST(self, name=None):
         log.warn('====== POST %s %s ======', self.req.path, self.req.query_string)
-        return self.GET(name)
+        
+        try:
+            func = getattr(self, name, None)
+            if not func:
+                return httpcore.NotFound()
+            code, ret = func()
 
+            if code == OK:
+                return self.succ(ret)
+            else:
+                return self.fail(code, ret)
+        except:
+            log.error(traceback.format_exc())
+            return self.fail(ERR_INTERNAL)
+       
     def fail(self, ret, debug=''):
         advance.APIHandler.fail(self, ret, errstr[ret], debug)
 
 
 
 class BaseObjectHandler (BaseHandler):
-
     def _convert_data(self, data):
         def _convert_row(row):
             for k in ['id', 'userid', 'groupid', 'roleid', 'permid', 'parentid']:
@@ -130,13 +149,9 @@ class BaseObjectHandler (BaseHandler):
             for row in data:
                 _convert_row(row)
 
-
-
     @with_validator([F('id',T_INT)])
-    def get_arg(self):
-        return self.get(self.data['id'])
- 
-    def get(self, xid):
+    def get(self):
+        xid = self.data.get('id')
         with get_connection(self.dbname) as conn:
             ret = conn.select_one(self.table, where={'id':xid})
             if ret:
@@ -146,7 +161,7 @@ class BaseObjectHandler (BaseHandler):
 
     #@with_validator([F('page',T_INT,default=1), F('pagesize',T_INT,default=20)])
     # 必须自己定义装饰器来限制参数
-    def get_list_arg(self):
+    def get_list(self):
         where = {}
         for k in self.data:
             if k in ['page', 'pagesize']:
@@ -159,10 +174,10 @@ class BaseObjectHandler (BaseHandler):
             else:
                 where[k] = v
 
-        return self.get_list(self.data['page'], self.data['pagesize'], where)
+        return self.get_data(self.data['page'], self.data['pagesize'], where)
  
     
-    def get_list(self, page, pagesize, where=None):
+    def get_data(self, page, pagesize, where=None):
         log.debug('list page:%s pagesize:%s', str(page), str(pagesize))
         retdata = {'page':page, 'pagesize':pagesize, 'pagenum':0}
         with get_connection(self.dbname) as conn:
@@ -177,7 +192,7 @@ class BaseObjectHandler (BaseHandler):
         return OK, retdata
 
 
-    def insert(self):
+    def create(self):
         data = self.validator.data
         t = int(time.time())
         for k in ['ctime']:
@@ -194,26 +209,18 @@ class BaseObjectHandler (BaseHandler):
             else:
                 return ERR_DATA, 'insert error'
 
-    def update(self):
-        xid = self.data.get('id')
-        log.debug('xid:%s', xid)
-
+    def modify(self):
         data = copy.copy(self.data)
-        data.pop('id')
-        
         log.debug('data:%s', self.data)
         if not data:
             return ERR_PARAM, 'param error'
 
-        delks = []
-        for k,v in data.items():
-            if not v:
-                delks.append(k)
-        for k in delks:
-            data.pop(k)
-
+        xid = data.pop('id')
         if isinstance(xid, (list, tuple)):
             xid = ('in', xid)
+
+        if not data:
+            return ERR_PARAM, 'no data'
 
         with get_connection(self.dbname) as conn:
             ret = conn.update(self.table, data, where={'id':xid})
@@ -225,62 +232,17 @@ class BaseObjectHandler (BaseHandler):
             else:
                 return ERR_DATA, 'update error'
 
-    @with_validator([F('id', T_INT)])
-    def delete(self):
-        xid = self.data.get('id')
+    def query(self):
+        data = self.req.input()
+        if data.get('id'):
+            return self.get()
+        else:
+            return self.get_list()
+
+    def delete(self, xid):
+        xid = int(xid)
         with get_connection(self.dbname) as conn:
             ret = conn.delete(self.table, where={'id':xid})
             return OK, ret
-
-    
-    def GET(self, name):
-        log.warn('====== GET %s %s ======', self.req.path, self.req.query_string)
-        try:
-            ret = None
-            if name == 'q':
-                code, ret = self.get_arg()
-            elif name == 'list':
-                code, ret = self.get_list_arg()
-            elif hasattr(self, name):
-                code, ret = getattr(self, name)()
-            else:
-                self.fail(ERR_PARAM, 'url %s not found' % (name))
-                return
-
-            if code == OK:
-                self.succ(ret)
-            else:
-                self.fail(code, ret)
-        except Exception as e:
-            log.error(traceback.format_exc())
-            self.fail(ERR_INTERNAL, str(e))
-
-    
-    def POST(self, name):
-        log.warn('====== POST %s %s ======', self.req.path, self.req.query_string)
-        log.debug('name:%s', name)
-        try:
-            ret = None
-            if name == 'add':
-                code, ret = self.insert()
-            elif name == 'mod':
-                code, ret = self.update()
-            elif name == 'del':
-                code, ret = self.delete()
-            elif hasattr(self, name):
-                code, ret = getattr(self, name)()
-            else:
-                self.fail(ERR_PARAM, 'url %s not found' % (name))
-                return
-
-            if code == OK:
-                self.succ(ret)
-            else:
-                self.fail(code, ret)
-
-        except Exception as e:
-            log.error(traceback.format_exc())
-            self.fail(ERR_INTERNAL, str(e))
-
 
 

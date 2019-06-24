@@ -31,12 +31,12 @@ class Perm (BaseObjectHandler):
         return BaseObjectHandler.POST(self, name)
 
     @with_validator([F('name'), F('info')])
-    def insert(self):
-        return BaseObjectHandler.insert(self)
+    def create(self):
+        return BaseObjectHandler.create(self)
  
     @with_validator([F('id', T_INT), F('name'), F('info')])
-    def update(self):
-        return BaseObjectHandler.update(self)
+    def modify(self):
+        return BaseObjectHandler.modify(self)
 
     @with_validator([
         F('page',T_INT,default=1), 
@@ -44,8 +44,8 @@ class Perm (BaseObjectHandler):
         F('name'), 
         F('ctime', T_DATETIME), 
     ])
-    def get_list_arg(self):
-        return BaseObjectHandler.get_list_arg(self)
+    def get_list(self):
+        return BaseObjectHandler.get_list(self)
  
  
 class Role (BaseObjectHandler):
@@ -73,8 +73,8 @@ class Role (BaseObjectHandler):
             return OK, ret
 
 
-    def get_list(self, page, pagesize, where=None):
-        retcode, retdata = BaseObjectHandler.get_list(self, page, pagesize, where)
+    def get_data(self, page, pagesize, where=None):
+        retcode, retdata = BaseObjectHandler.get_data(self, page, pagesize, where)
         if retcode == OK and retdata and retdata['data']:
             roleids = ','.join([ str(x['id']) for x in retdata['data'] ])
         
@@ -103,7 +103,7 @@ class Role (BaseObjectHandler):
 
  
     @with_validator([F('id', T_INT, must=True), F('permid', T_INT, must=True) ])
-    def addperm(self):
+    def perm_give(self):
         permid = self.data.get('permid')
         
         values = []
@@ -121,7 +121,7 @@ class Role (BaseObjectHandler):
         return OK, {'rows':len(values)}
 
     @with_validator([F('id', T_INT), F('permid', T_INT), F('roleperm_id', T_INT)  ])
-    def delperm(self):
+    def perm_take(self):
         roleid = self.data.get('id')
         permid = self.data.get('permid')
         roleperm_id = self.data.get('roleperm_id')
@@ -153,12 +153,12 @@ class Role (BaseObjectHandler):
         return BaseObjectHandler.POST(self, name)
 
     @with_validator([F('name'), F('info')])
-    def insert(self):
-        return BaseObjectHandler.insert(self)
+    def create(self):
+        return BaseObjectHandler.create(self)
  
     @with_validator([F('id', T_INT), F('name'), F('info')])
-    def update(self):
-        return BaseObjectHandler.update(self)
+    def modify(self):
+        return BaseObjectHandler.modify(self)
  
     @with_validator([
         F('page',T_INT,default=1), 
@@ -166,7 +166,7 @@ class Role (BaseObjectHandler):
         F('name'), 
         F('ctime', T_DATETIME), 
     ])
-    def get_list_arg(self):
-        return BaseObjectHandler.get_list_arg(self)
+    def get_list(self):
+        return BaseObjectHandler.get_list(self)
 
 

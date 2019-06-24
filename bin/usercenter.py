@@ -11,8 +11,6 @@ import logging
 from userbase import *
 import utils
 
-#import pdb
-#pdb.set_trace()
 
 log = logging.getLogger()
 
@@ -30,9 +28,8 @@ class UserBase (BaseHandler):
     table  = 'users'
     dbname = 'usercenter'
 
-
     @cache.with_cache(60)
-    def login_settings(self):
+    def settings(self):
         retdata = {}
         with get_connection(self.dbname) as conn:
             ret = conn.select('settings')
@@ -50,17 +47,15 @@ class UserBase (BaseHandler):
         F('email', T_MAIL), 
         F('mobile', T_MOBILE),
     ])
-    def login(self):
-        data = self.validator.data
-    
+    def signin(self):
         try:
-            username = data.get('username')
-            password = data.get('password')
-            email    = data.get('email')
-            mobile   = data.get('mobile')
+            username = self.data.get('username')
+            password = self.data.get('password')
+            email    = self.data.get('email')
+            mobile   = self.data.get('mobile')
 
             if not username and not email and not mobile:
-                return self.fail(ERR, 'username/email/mobile must have one')
+                return ERR, 'username/email/mobile must have one'
 
             if username:
                 login_key = 'username'
@@ -72,38 +67,38 @@ class UserBase (BaseHandler):
             ret = None
             with get_connection(self.dbname) as conn:
                 where = {
-                    login_key: data.get(login_key)
+                    login_key: self.data.get(login_key)
                 }
                 #log.debug('where:%s', where)
                 ret = conn.select_one(self.table, where, "id,username,email,password,isadmin,status")
                 log.debug('select:%s', ret)
                 if not ret:
-                    return self.fail(ERR_USER, login_key + ' not found')
+                    return ERR_USER, login_key + ' not found'
 
                 # password:   sha1$123456$AJDKLJDLAKJKDLSJKLDJALASASASA
                 px = ret['password'].split('$')
                 pass_enc = create_password(password, int(px[1]))
                 if ret['password'] != pass_enc:
-                    return self.fail(ERR_AUTH, 'username or password error')
+                    return ERR_AUTH, 'username or password error'
 
                 if ret['status'] != STATUS_OK:
-                    return self.fail(ERR_AUTH, "status error")
+                    return ERR_AUTH, "status error"
      
                 conn.update(self.table, {'logtime':int(time.time())}, where={'id':ret['id']})
 
                 retcode, userinfo = self.get_user(ret['id'])
+                log.debug('get user: %d %s', retcode, userinfo)
 
             sesdata = {
-                'userid':ret['id'], 
+                'userid':int(ret['id']), 
                 'username':ret['username'], 
                 'isadmin':ret['isadmin'], 
                 'status': userinfo['status'],
                 'allperm':[ x['name'] for x in userinfo['allperm']],
             }
             self.ses.update(sesdata)
-
-            #self.succ({'id':str(ret['id']), 'username':ret['username']})
-            self.succ(userinfo)
+            
+            return OK, userinfo
         except Exception as e:
             log.error(traceback.format_exc())
             return self.fail(ERR, 'Exception:' + str(e))
@@ -113,7 +108,7 @@ class UserBase (BaseHandler):
         F('code', must=True),
         F('openid'), 
     ])
-    def login3rd(self):
+    def signin_3rd(self):
         try:
             appid = self.data.get('appid')
             code  = self.data.get('code')
@@ -122,7 +117,7 @@ class UserBase (BaseHandler):
             if not openid:
                 openid = utils.get_openid(code, appid)
                 if not openid:
-                    return self.fail(ERR_AUTH, 'openid error')
+                    return ERR_AUTH, 'openid error'
 
             ret = None
             with get_connection(self.dbname) as conn:
@@ -132,7 +127,7 @@ class UserBase (BaseHandler):
                 }
                 ret = conn.select_one('openuser', where, 'userid')
                 if not ret:
-                    return self.fail(ERR_AUTH, 'apppid/openid error')
+                    return ERR_AUTH, 'apppid/openid error'
 
                 userid = ret['userid']
 
@@ -140,14 +135,13 @@ class UserBase (BaseHandler):
                 ret = conn.select_one(self.table, {'id':userid}, "id,username,email,password,isadmin,status")
                 log.debug('select:%s', ret)
                 if not ret:
-                    return self.fail(ERR_USER, ' appid/openid not found')
+                    return ERR_USER, ' appid/openid not found'
 
                 conn.update(self.table, {'logtime':int(time.time())}, where={'id':userid})
 
-        
             retcode, userinfo = self.get_user(ret['id'])
             sesdata = {
-                'userid':ret['id'], 
+                'userid':int(ret['id']), 
                 'username':ret['username'], 
                 'isadmin':ret['isadmin'], 
                 'status': userinfo['status'],
@@ -159,12 +153,10 @@ class UserBase (BaseHandler):
             self.ses.update(sesdata)
 
             #self.succ({'id':str(ret['id']), 'username':ret['username']})
-            self.succ(userinfo)
+            return OK, userinfo
         except Exception as e:
             log.error(traceback.format_exc())
             return self.fail(ERR, 'Exception:' + str(e))
-
-
 
 
     @with_validator([
@@ -173,14 +165,13 @@ class UserBase (BaseHandler):
         F('email', T_MAIL),
         F('mobile', T_MOBILE),
     ])
-    def register(self):
-        data = self.validator.data
-        log.info('data:%s', data)
+    def signup(self):
+        log.info('data:%s', self.data)
         
-        email = data.get('email','')
-        mobile = data.get('mobile','')
-        username = data.get('username','')
-        password = data.get('password','')
+        email    = self.data.get('email','')
+        mobile   = self.data.get('mobile','')
+        username = self.data.get('username','')
+        password = self.data.get('password','')
         pass_enc = create_password(password)
 
         try:
@@ -201,13 +192,13 @@ class UserBase (BaseHandler):
                 insertdata['username'] = username
 
             if not email and not mobile:
-                return self.fail(ERR_PARAM, 'email/mobile must not null')
+                return ERR_PARAM, 'email/mobile must not null'
 
             lastid = -1
             with get_connection(self.dbname) as conn:
                 ret = conn.select(self.table, where, 'id')
                 if len(ret) >= 1:
-                    return self.fail(ERR_USER, 'username or email or mobile exist')
+                    return ERR_USER, 'username or email or mobile exist'
                 insertdata['id'] = createid.new_id64(conn=conn)
                 conn.insert(self.table, insertdata)
           
@@ -224,9 +215,7 @@ class UserBase (BaseHandler):
                 self.ses.update(sesdata)
 
             retcode, userinfo = self.get_user(insertdata['id'])
-            #resp = self.succ({'id':str(insertdata['id']), 'username':username, 'email':email, 'mobile':mobile})
-            resp = self.succ(userinfo)
-            return resp
+            return OK, userinfo
         except Exception as e:
             log.error(traceback.format_exc())
             return self.fail(ERR, 'error:' + str(e))
@@ -237,7 +226,7 @@ class UserBase (BaseHandler):
         F('id', T_INT), 
         F('openid'), 
     ])
-    def reg3rd_args(self):
+    def signup_3rd_args(self):
         appid = self.data.get('appid')
         code  = self.data.get('code')
         userid= self.data.get('id')
@@ -246,11 +235,11 @@ class UserBase (BaseHandler):
         if not openid:
             openid = utils.get_openid(code, appid)
             if not openid:
-                return self.fail(ERR_AUTH, 'openid error')
+                return ERR_AUTH, 'openid error'
             
-        return self.reg3rd(appid, openid, userid)
+        return self.signup_3rd(appid, openid, userid)
 
-    def reg3rd(self, appid, openid, userid=None):
+    def signup_3rd(self, appid, openid, userid=None):
         try:
             where = {
                 'appid':appid,
@@ -266,12 +255,12 @@ class UserBase (BaseHandler):
             with get_connection(self.dbname) as conn:
                 ret = conn.select_one('openuser', where=where, fields='userid')
                 if ret:
-                    return self.fail(ERR_USER, 'user exist')
+                    return ERR_USER, 'user exist'
 
                 if userid:
                     ret = conn.select_one(self.table, where={'id':userid}, fields='id')
                     if not ret:
-                        return self.fail(ERR_USER, 'user error')
+                        return ERR_USER, 'user error'
 
                 
                 if not userid:
@@ -305,9 +294,7 @@ class UserBase (BaseHandler):
                 self.ses.update(sesdata)
 
             retcode, userinfo = self.get_user(user_data['id'])
-            #resp = self.succ({'id':str(user_data['id']), 'username':username, 'email':email, 'mobile':mobile})
-            resp = self.succ(userinfo)
-            return resp
+            return OK, userinfo
         except Exception as e:
             log.error(traceback.format_exc())
             return self.fail(ERR, 'error:' + str(e))
@@ -318,7 +305,7 @@ class UserBase (BaseHandler):
         F('code', must=True),
         F('openid'), 
     ])
-    def login_reg_3rd(self):
+    def signauto_3rd(self):
         try:
             appid = self.data.get('appid')
             code  = self.data.get('code')
@@ -327,7 +314,7 @@ class UserBase (BaseHandler):
             if not openid:
                 openid = utils.get_openid(code, appid)
                 if not openid:
-                    return self.fail(ERR_AUTH, 'openid error')
+                    return ERR_AUTH, 'openid error'
 
             ret = None
             with get_connection(self.dbname) as conn:
@@ -337,7 +324,7 @@ class UserBase (BaseHandler):
                 }
                 ret = conn.select_one('openuser', where, 'userid')
                 if not ret: # not found user
-                    return self.reg3rd(appid, openid)
+                    return self.signup_3rd(appid, openid)
 
                 userid = ret['userid']
 
@@ -345,14 +332,13 @@ class UserBase (BaseHandler):
                 ret = conn.select_one(self.table, {'id':userid}, "id,username,email,password,isadmin,status")
                 log.debug('select:%s', ret)
                 if not ret:
-                    return self.fail(ERR_USER, ' appid/openid not found')
+                    return ERR_USER, ' appid/openid not found'
 
                 conn.update(self.table, {'logtime':int(time.time())}, where={'id':userid})
-
         
             retcode, userinfo = self.get_user(ret['id'])
             sesdata = {
-                'userid':ret['id'], 
+                'userid':int(ret['id']), 
                 'username':ret['username'], 
                 'isadmin':ret['isadmin'], 
                 'status': userinfo['status'],
@@ -362,34 +348,31 @@ class UserBase (BaseHandler):
                 'plat':config.OPENUSER_ACCOUNT[appid]['plat'],
             }
             self.ses.update(sesdata)
-            self.succ(userinfo)
+            return OK, userinfo
         except Exception as e:
             log.error(traceback.format_exc())
             return self.fail(ERR, 'Exception:' + str(e))
 
 
-
-
-    @with_validator([F('userid', T_INT),])
-    def get_user_arg(self):
+    @with_validator([F('id', T_INT),])
+    def get_user_info(self):
+        userid_in = self.data.get('id', 0)
+        userid  = self.ses.get('userid', 0)
         isadmin = self.ses.get('isadmin', 0)
-        userid = int(self.ses['userid'])
-        in_userid = self.data.get('userid')
-
-        if in_userid:
+        
+        if userid_in and  userid != userid_in:
             if not isadmin:
+                log.info('userid_in:%d userid:%d isadmin:%d', userid_in, userid, isadmin)
                 return ERR_PERM, 'permission deny'
             else:
-                userid = in_userid
- 
-        retcode, data = self.get_user(userid)
+                userid = userid_in
 
-        if retcode < 0:
-            return self.fail(retcode, data)
-        return self.succ(data)
+        retcode, data = self.get_user(userid)
+        return retcode, data
 
     def get_user(self, userid):
         userid = int(userid)
+
         where = {'id':userid}
         user = None
         groups = None
@@ -455,7 +438,7 @@ class UserBase (BaseHandler):
     ])
     def get_user_list(self):
         if not self.ses.get('isadmin', 0):
-            return self.fail(ERR_PERM, 'permission deny')
+            return ERR_PERM, 'permission deny'
             
         data = self.data
         pagecur  = int(data.get('page', 1))
@@ -552,35 +535,33 @@ class UserBase (BaseHandler):
             'pagenum':page.pages, 
             'data':pdata,
         }
-        return self.succ(pagedata)
+        return OK, pagedata
 
     @with_validator([
         F('username'), 
         F('password'), 
         F('mobile', T_MOBILE),
         F('status', T_INT), 
+        F('id', T_INT), 
         F('extend'),
-        F('userid', T_INT),
     ]) 
-    def modify_user(self):
+    def modify(self):
         # modify username/status/password/extend
-        data = self.validator.data
-
-        isadmin = self.ses['isadmin']
-        userid = self.ses['userid']
-        in_userid = self.data.get('userid')
+        userid_in = self.data.get('id', 0)
+        isadmin = self.ses.get('isadmin', 0)
+        userid  = self.ses.get('userid', 0)
         
-        if in_userid:
+        if userid_in and userid != userid_in:
             if not isadmin:
-                return self.fail(ERR_PERM, 'permission deny')
+                return ERR_PERM, 'permission deny'
             else:
-                userid = in_userid
+                userid = userid_in
         
         values = {}
         where  = {'id':userid}
        
         for k in ['username', 'password', 'extend', 'status', 'mobile']:
-            v = data.get(k)
+            v = self.data.get(k)
             if k == 'password' and v:
                 values['password'] = create_password(v)
             elif k == 'extend' and v:
@@ -592,37 +573,35 @@ class UserBase (BaseHandler):
         log.debug('update values:%s', values)
         if not values:
             log.info('no modify info')
-            return self.fail(ERR_PARAM)
+            return ERR_PARAM, 'not modify'
 
         values['utime'] = DBFunc("UNIX_TIMESTAMP(now())")
 
         with get_connection(self.dbname) as conn:
             ret = conn.update(self.table, values, where)
             if ret != 1:
-                return self.fail(ERR, 'condition error')
+                return ERR_PARAM, 'condition error'
 
             ret = conn.select_one(self.table, where={'id':userid}, 
                     fields="id,username,mobile,status,ctime,utime")
 
-        #values['id'] = str(where['id'])
-        return self.succ(ret)
+        return OK, ret
 
     @with_validator([
         F('groupid', T_INT, must=True),
         F('userid', T_INT),
     ])
-    def add_group(self):
+    def group_join(self):
         isadmin = self.ses['isadmin']
         userid = self.ses['userid']
         in_userid = self.data.get('userid')
         
         if in_userid:
             if not isadmin:
-                return self.fail(ERR_PERM, 'permission deny')
+                return ERR_PERM, 'permission deny'
             else:
                 userid = in_userid
         
-
         groupid = self.data.get('groupid')
        
         t = int(time.time())
@@ -636,16 +615,16 @@ class UserBase (BaseHandler):
             }
             ret = conn.insert('user_group', data)
             if ret != 1:
-                return self.fail(ERR_DB)
+                return ERR_DB, 'error'
 
             ret = conn.select_one('user_group', where={'id':data['id']})
             for k in ['id','userid','groupid']:
                 ret[k] = str(ret[k])
-            return self.succ(ret)
+            return OK, ret
 
 
     @with_validator([F('groupid', T_INT, must=True)])
-    def del_group(self):
+    def group_quit(self):
         isadmin = self.ses.get('isadmin', 0)
         groupid = self.data.get('groupid')
         #userid = self.ses['userid']
@@ -658,25 +637,24 @@ class UserBase (BaseHandler):
 
         with get_connection(self.dbname) as conn:
             ret = conn.delete('user_group', where=where)
-            return self.succ(ret)
+            return OK, ret
 
     @with_validator([
         F('permid', T_INT, default=0), 
         F('roleid', T_INT, default=0),
         F('userid', T_INT),
     ])
-    def add_perm_role(self):
+    def perm_give(self):
         isadmin = self.ses.get('isadmin', 0)
         userid = self.ses['userid']
         in_userid = self.data.get('userid')
         
         if in_userid:
             if not isadmin:
-                return self.fail(ERR_PERM, 'permission deny')
+                return ERR_PERM, 'permission deny'
             else:
                 userid = in_userid
  
-
         roleid = self.data.get('roleid')
         permid = self.data.get('permid')
             
@@ -712,14 +690,14 @@ class UserBase (BaseHandler):
 
                 ret = conn.insert('user_perm', data)
                 if ret != 1:
-                    return self.fail(ERR_DB)
+                    return ERR_DB, 'error'
 
             ret = conn.select('user_perm', where={'id':('in', ids)})
             for row in ret:
                 for k in ['id','userid','roleid','permid']:
                     row[k] = str(row[k])
 
-            return self.succ(ret)
+            return OK, ret
 
 
     @with_validator([
@@ -727,7 +705,7 @@ class UserBase (BaseHandler):
         F('roleid', T_INT, default=0),
         F('userid', T_INT),
     ])
-    def del_perm_role(self):
+    def perm_take(self):
         isadmin = self.ses.get('isadmin', 0)
         userid = self.data.get('userid', 0)
         #userid = self.ses.get('userid', 0)
@@ -748,65 +726,30 @@ class UserBase (BaseHandler):
 
         with get_connection(self.dbname) as conn:
             ret = conn.delete('user_perm', where=where)
-            return self.succ()
+            return OK, {}
 
 
 class User (UserBase):
     session_nocheck = [
         '/uc/v1/user/signup',
-        '/uc/v1/user/signup3rd',
-        '/uc/v1/user/login',
-        '/uc/v1/user/login3rd',
-        '/uc/v1/user/login_reg_3rd',
+        '/uc/v1/user/signup_3rd',
+        '/uc/v1/user/signin',
+        '/uc/v1/user/signin_3rd',
+        '/uc/v1/user/signauto_3rd',
     ]
 
-    def GET(self, name=None):
-        log.warn('====== GET %s %s ======', self.req.path, self.req.query_string)
-        try:
-            if name == 'login' or name == 'signin':  # /login
-                return self.login()
-            elif name == 'login3rd' or name == 'signin3rd':
-                return self.login3rd()
-            elif name == 'logout': # /logout
-                if self.ses:
-                    self.ses.remove()
-                return self.succ()
-            elif name == 'q':
-                return self.get_user_arg()
-            elif name == 'list':
-                return self.get_user_list()
-            else:
-                return httpcore.NotFound()
-        except:
-            log.error(traceback.format_exc())
-            self.fail(ERR_PARAM)
+    def query(self):
+        data = self.req.input()
+        if data.get('id'):
+            return self.get_user_info()
+        else:
+            return self.get_user_list()
 
-    def POST(self, name):
-        log.warn('====== POST %s %s ======', self.req.path, self.req.query_string)
-        try:
-            if name == 'signup':
-                return self.register()
-            if name == 'signup3rd':
-                return self.reg3rd_args()
-            elif name == 'login_reg_3rd':
-                return self.login_reg_3rd()
-            elif name == 'mod':
-                return self.modify_user()
-            elif name == 'addgroup':
-                return self.add_group()
-            elif name == 'delgroup':
-                return self.del_group()
-            elif name == 'addperm':
-                return self.add_perm_role()
-            elif name == 'delperm':
-                return self.del_perm_role()
-            else:
-                return httpcore.NotFound()
+    def create(self):
+        return self.signup()
 
-        except:
-            log.error(traceback.format_exc())
-            self.fail(ERR_PARAM)
-
+    def delete(self):
+        return ERR_PARAM, 'not support' 
 
     def error(self, data):
         self.fail(ERR_PARAM)

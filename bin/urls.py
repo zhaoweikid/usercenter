@@ -3,13 +3,15 @@
 urls = (
     ('^/uc/v1/ping', "usercenter.Ping"),
     # 用户管理
-    ('^/uc/v1/user/(login|login3rd|login_reg_3rd|logout|q|list|signup|signup3rd|mod|addgroup|delgroup|addperm|delperm)$', "usercenter.User"),
+    ('^/uc/v1/user(?:/([0-9]+))?$', "usercenter.User"),
+    ('^/uc/v1/user/(query|modify|signin|signin_3rd|signout|signup|signup_3rd|group_join|group_quit|perm_give|perm_take)$', 
+            "usercenter.User"),
     # 用户组管理
-    ('^/uc/v1/group/(add|del|mod|q|list)$', "groups.Group"),
+    ('^/uc/v1/group/(create|modify|query|delete)?$', "groups.Group"),
     # 权限管理
-    ('^/uc/v1/perm/(add|del|mod|q|list)$', "perms.Perm"),
+    ('^/uc/v1/perm/(create|modify|query|delete)?$', "perms.Perm"),
     # 角色管理
-    ('^/uc/v1/role/(add|del|mod|q|list|addperm|delperm)$', "perms.Role"),
+    ('^/uc/v1/role/(create|modify|query|delete|perm_give|perm_take)$', "perms.Role"),
     # 管理员功能
     ('^/uc/v1/admin/(userlist)$', "admin.Admin"),
 

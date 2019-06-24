@@ -15,12 +15,12 @@ class Group (BaseObjectHandler):
     table = 'groups'
 
     @with_validator([F('name'), F('info'), F('parentid', T_INT)])
-    def insert(self):
-        return BaseObjectHandler.insert(self)
+    def create(self):
+        return BaseObjectHandler.create(self)
  
     @with_validator([F('id', T_INT), F('info'), F('name'), F('parentid', T_INT)])
-    def update(self):
-        return BaseObjectHandler.update(self)
+    def modify(self):
+        return BaseObjectHandler.modify(self)
 
     @with_validator([
         F('page',T_INT,default=1), 
@@ -28,6 +28,6 @@ class Group (BaseObjectHandler):
         F('name'), 
         F('ctime', T_DATETIME), 
     ])
-    def get_list_arg(self):
-        return BaseObjectHandler.get_list_arg(self)
+    def get_list(self):
+        return BaseObjectHandler.get_list(self)
  

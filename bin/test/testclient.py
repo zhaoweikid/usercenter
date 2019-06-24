@@ -111,7 +111,6 @@ class User (Base):
 
     def clear(self):
         ret = self.user_db()
-       
         if self.appid:
             sqls = ["delete from openuser where appid='%s'" % (self.appid) ]
         else:
@@ -150,92 +149,60 @@ class User (Base):
                 self.userid = ret['id']
             return ret
 
-
     def get_last(self, table):
         where = {}
-
         if table == 'users':
             where['id'] = self.userid
         else:
             where['userid'] = self.userid
-
         with dbpool.get_connection('usercenter') as conn:
             ret = conn.select_one(table, where=where, other=' order by id desc limit 1')
             return ret
 
-
-
     def signup(self): 
         url = self.prefix_url + '/signup?mobile=%s&password=123456&username=zhaowei%d&email=zhaowei%d@qq.com' % \
             (self.mobile, self.userid, self.userid)
-
         return request(url, 'POST')
-
 
     def signup3rd(self, code): 
-        url = self.prefix_url + '/signup3rd?appid=%s&code=%s' % \
+        url = self.prefix_url + '/signup_3rd?appid=%s&code=%s' % \
             (self.appid, code)
-
         return request(url, 'POST')
 
-    def login(self):
-        url = self.prefix_url + '/login?password=123456&mobile=%s' % (self.mobile)
-        return request(url, 'GET')
-
-
-    def login3rd(self, code):
-        url = self.prefix_url + '/login3rd?appid=%s&code=%s' % (self.appid, code)
-        return request(url, 'GET')
-
-    def login_reg_3rd(self, code):
-        url = self.prefix_url + '/login_reg_3rd?appid=%s&code=%s' % (self.appid, code)
+    def signin(self):
+        url = self.prefix_url + '/signin?password=123456&mobile=%s' % (self.mobile)
         return request(url, 'POST')
 
+    def signin_3rd(self, code):
+        url = self.prefix_url + '/signin_3rd?appid=%s&code=%s' % (self.appid, code)
+        return request(url, 'POST')
 
+    def signauto_3rd(self, code):
+        url = self.prefix_url + '/signauto_3rd?appid=%s&code=%s' % (self.appid, code)
+        return request(url, 'POST')
 
-    def q(self, userid=None):
-        url = self.prefix_url + '/q'
-        if userid:
-            url += '?userid=' + str(userid)
-        return request(url, 'GET')
-
-    def list(self, **args):
-        url = self.prefix_url + '/list'        
+    def query(self, **args):
+        url = self.prefix_url + '/query'
         return request(self.make_args(url, args), 'GET')
-    
-    def mod(self, **args):
-        url = self.prefix_url + '/mod'
+
+    def modify(self, **args):
+        url = self.prefix_url + '/modify'
         return request(self.make_args(url, args), 'POST')
     
-    def addgroup(self, groupid):
-        url = self.prefix_url + '/addgroup?groupid=%d' % int(groupid)
+    def group_join(self, groupid):
+        url = self.prefix_url + '/group_join?groupid=%d' % int(groupid)
         return request(url, 'POST')
 
-    def delgroup(self, groupid):
-        url = self.prefix_url + '/delgroup?groupid=%d' % int(groupid)
+    def group_quit(self, groupid):
+        url = self.prefix_url + '/group_quit?groupid=%d' % int(groupid)
         return request(url, 'POST')
 
-    def addperm(self, **args):
-        url = self.prefix_url + '/addperm'
-
-        #if permid:
-        #    url += "?permid=%d" % int(permid)
-        #elif roleid:
-        #    url += "?roleid=%d" % int(roleid)
-        #return request(url, 'POST')
-
+    def perm_give(self, **args):
+        url = self.prefix_url + '/perm_give'
         return request(self.make_args(url, args), 'POST')
 
-
-    def delperm(self, **args):
-        url = self.prefix_url + '/delperm'
-
-        #if permid:
-        #    url += "?permid=%d" % int(permid)
-        #elif roleid:
-        #    url += "?roleid=%d" % int(roleid)
-        #return request(url, 'POST')
-
+    def perm_take(self, **args):
+        url = self.prefix_url + '/perm_take'
         return request(self.make_args(url, args), 'POST')
 
 
@@ -251,47 +218,40 @@ class Group (Base):
             for x in self.delete_sqls:
                 conn.execute(x)
 
-    def add(self, **args):
-        url = self.prefix_url + '/add'
-        data = {}
-
-        for k in self.fields:
-            data[k] = args[k]
-        return request(self.make_args(url, data), 'POST')
+    def create(self, **args):
+        url = self.prefix_url + '/create'
+        return request(self.make_args(url, args), 'POST')
 
     def delete(self, xid):
-        url = self.prefix_url + '/del?id=' + str(xid)
+        url = self.prefix_url + '/delete?id=' + str(xid)
+        return request(url, 'POST')
+
+    def modify(self, xid, **args):
+        url = self.prefix_url + '/modify'
+        
+        data = {}
+        if ',' in xid:
+            data['id__in'] = xid
+        else:
+            data['id'] = xid
+        data.update(args)
+
+        #data['id'] = xid
+        #for k in self.fields:
+        #    if k in args:
+        #        data[k] = args[k]
+
         return request(self.make_args(url, data), 'POST')
 
-    def mod(self, xid, **args):
-        url = self.prefix_url + '/mod'
-        data = {}
-        
-        #if ',' in xid:
-        #    data['id__in'] = xid
-        #else:
-        #    data['id'] = xid
+    def query(self, **args):
+        url = self.prefix_url + '/query'
+            
+        #data = {}
+        #for k in self.fields:
+        #    if k in args:
+        #        data[k] = args[k] 
+        return request(self.make_args(url, args), 'GET')
 
-        data['id'] = xid
-        for k in self.fields:
-            if k in args:
-                data[k] = args[k]
-
-        return request(self.make_args(url, data), 'POST')
-
-    def q(self, xid):
-        url = self.prefix_url + '/q?id=' + str(xid)
-        return request(url, 'GET')
-
-    def list(self, **args):
-        url = self.prefix_url + '/list'
-        data = {}
-        
-        for k in self.fields:
-            if k in args:
-                data[k] = args[k] 
-
-        return request(self.make_args(url, data), 'GET')
 
 
 class Role (Group):
@@ -301,12 +261,12 @@ class Role (Group):
         self.fields = ['name', 'info']
         self.delete_sqls = ["delete from roles"]
 
-    def addperm(self, **args):
-        url = self.prefix_url + '/addperm'        
+    def perm_give(self, **args):
+        url = self.prefix_url + '/perm_give'        
         return request(self.make_args(url, args), 'GET')
         
-    def delperm(self, **args):
-        url = self.prefix_url + '/delperm'        
+    def perm_take(self, **args):
+        url = self.prefix_url + '/perm_take'        
         return request(self.make_args(url, args), 'GET')
  
 
@@ -330,8 +290,9 @@ def test_user_create():
     ret = u.signup()
     print(ret)
 
-    ret = u.login()
+    ret = u.signin()
     print(ret)
+    userid = ret['data']['id']
 
     u.user_db()
     last = u.get_last('users')
@@ -339,7 +300,7 @@ def test_user_create():
     assert last['id'] == int(ret['data']['id'])
     print('='*20, 'signup ok', '='*20)
 
-    print(u.q())
+    print(u.query(id=userid))
 
 def test_user_list():
     global u
@@ -347,13 +308,14 @@ def test_user_list():
     userinfo = u.user_db()
     u.set_admin(1)
 
-    ret = u.login()
-    u.q()
-    u.list()
-    ret = u.list(mobile=u.mobile)
+    ret = u.signin()
+    userid = ret['data']['id']
+
+    u.query(id=userid)
+    ret = u.query(mobile=u.mobile)
     assert len(ret['data']['data']) == 1
 
-    ret = u.list(username=userinfo['username'])
+    ret = u.query(username=userinfo['username'])
     assert len(ret['data']['data']) == 1
 
     from1 = userinfo['ctime'] - 100 
@@ -364,26 +326,27 @@ def test_user_list():
 
     s = '%s,%s' % (str(fromdt)[:19], str(todt)[:19])
 
-    ret = u.list(ctime__bt=s)
+    ret = u.query(ctime__bt=s)
     assert len(ret['data']['data']) == 1
 
-    from2 = userinfo['ctime'] - 1000000
+    from2 = userinfo['ctime'] - 86400*365
     fromdt2 = datetime.datetime.fromtimestamp(from2)
     s2 = '%s,%s' % (str(fromdt2)[:19], str(todt)[:19])
-    ret = u.list(ctime__bt=s2)
+    ret = u.query(ctime__bt=s2)
     assert len(ret['data']['data']) >= 2
 
 
-def test_user_mod():
+def test_user_modify():
     global u
 
     userinfo = u.user_db()
 
-    ret = u.login()
+    ret = u.signin()
+    userid = ret['data']['id']
 
     old_status = userinfo['status']
     new_status = 2
-    ret = u.mod(status=new_status)
+    ret = u.modify(id=userid, status=new_status)
 
     assert ret['data']['status'] == new_status
 
@@ -391,7 +354,7 @@ def test_user_mod():
     old_pwd = userinfo['password']
     new_pwd = '123456'
 
-    ret = u.mod(password=new_pwd)
+    ret = u.modify(id=userid, password=new_pwd)
     newuser = u.user_db()
     assert old_pwd != newuser['password']
 
@@ -403,15 +366,16 @@ def test_user_query():
 
     userinfo = u.user_db()
 
-    ret = u.login()
+    ret = u.signin()
+    userid = ret['data']['id']
 
-    ret = u.q()
+    ret = u.query(id=userid)
     assert ret['data']['id'] == str(userinfo['id'])
 
-    ret = u.q(userid=userinfo['id'])
+    ret = u.query(id=userinfo['id'])
     assert ret['data']['id'] == str(userinfo['id'])
 
-    ret = u.q(userid=1)
+    ret = u.query(id=1)
     assert ret['data']['id'] == '1'
 
 
@@ -419,46 +383,47 @@ def test_user_query():
 def test_group():
     global u
 
-    u.login()
+    ret = u.signin()
+    userid = ret['data']['id']
 
     gp = Group()
     gp.clear()
-    ret = gp.add(name="组1", info="测试组1", parentid=0)
-    ret = gp.add(name="组2", info="测试组2", parentid=0)
-    ret = gp.add(name="组3", info="测试组3", parentid=0)
+    ret = gp.create(name="组1", info="测试组1", parentid=0)
+    ret = gp.create(name="组2", info="测试组2", parentid=0)
+    ret = gp.create(name="组3", info="测试组3", parentid=0)
 
 
     gpid = ret['data']['id']
 
-    gp.mod(gpid, name='组11', info='测试组11111')
+    gp.modify(gpid, name='组11', info='测试组11111')
 
-    rows = gp.list()
+    rows = gp.query()
 
     allids = ','.join([ x['id'] for x in rows['data']['data']])
 
-    gp.mod(allids, info='haha')
+    gp.modify(allids, info='haha')
 
-    rows = gp.list()
+    rows = gp.query()
 
     for row in rows['data']['data']:
         assert row['info'] == 'haha'
 
     one = rows['data']['data'][0]
 
-    rows = gp.list(name='组2')
+    rows = gp.query(name='组2')
     assert len(rows['data']['data']) == 1
 
-    ret = u.addgroup(one['id'])
+    ret = u.group_join(one['id'])
     groupid = ret['data']['groupid']
 
-    ret = u.q()
+    ret = u.query(id=userid)
     rows = ret['data']['group'] 
     groupdict =  set([ x['id'] for x in rows])
 
     assert groupid in groupdict
 
-    u.delgroup(one['id'])
-    ret = u.q()
+    u.group_quit(one['id'])
+    ret = u.query(id=userid)
     rows = ret['data']['group'] 
     groupdict =  set([ x['id'] for x in rows])
 
@@ -468,54 +433,56 @@ def test_group():
 def test_role():
     global u
 
-    u.login()
-    u.q()
+    ret = u.signin()
+    userid = ret['data']['id']
+
+    u.query(id=userid)
 
     r = Role()
     r.clear()
     
-    ret = r.add(name="角色1", info="测试角色1")
-    ret = r.add(name="角色2", info="测试角色2")
-    ret = r.add(name="角色3", info="测试角色3")
+    ret = r.create(name="角色1", info="测试角色1")
+    ret = r.create(name="角色2", info="测试角色2")
+    ret = r.create(name="角色3", info="测试角色3")
 
     rid = ret['data']['id']
 
-    r.mod(rid, name='角色11', info='测试角色11111')
+    r.modify(rid, name='角色11', info='测试角色11111')
 
-    rows = r.list()
+    rows = r.query()
 
     allids = ','.join([ x['id'] for x in rows['data']['data']])
 
-    r.mod(allids, info='haha')
+    r.modify(allids, info='haha')
 
-    rows = r.list()
+    rows = r.query()
 
     for row in rows['data']['data']:
         assert row['info'] == 'haha'
 
     one = rows['data']['data'][0]
 
-    rows = r.list(name='角色2')
+    rows = r.query(name='角色2')
     assert len(rows['data']['data']) == 1
 
-    ret = u.addperm(roleid=one['id'])
+    ret = u.perm_give(roleid=one['id'])
     roleid = ret['data'][0]['roleid']
 
-    ret = u.q()
+    ret = u.query(id=userid)
     rows = ret['data']['role'] 
     roledict =  set([ x['id'] for x in rows])
 
     assert roleid in roledict
 
-    u.delperm(roleid=one['id'])
-    ret = u.q()
+    u.perm_take(roleid=one['id'])
+    ret = u.query(id=userid)
     rows = ret['data']['role'] 
     roledict =  set([ x['id'] for x in rows])
 
     assert roleid not in roledict
 
-    u.addperm(roleid=allids)
-    ret = u.q()
+    u.perm_give(roleid=allids)
+    ret = u.query(id=userid)
     rows = ret['data']['role'] 
     roledict =  set([ x['id'] for x in rows])
 
@@ -525,62 +492,63 @@ def test_role():
 def test_perm():
     global u
 
-    u.login()
-    u.q()
+    ret = u.signin()
+    userid = ret['data']['id']
+    u.query(id=userid)
 
     r = Perm()
     r.clear()
     
-    ret = r.add(name="perm_view", info="查看权限")
-    ret = r.add(name="perm_mod", info="修改权限")
-    ret = r.add(name="group_view", info="创建组")
-    ret = r.add(name="group_mod", info="修改组")
+    ret = r.create(name="perm_view", info="查看权限")
+    ret = r.create(name="perm_mod", info="修改权限")
+    ret = r.create(name="group_view", info="创建组")
+    ret = r.create(name="group_mod", info="修改组")
 
     rid = ret['data']['id']
 
-    r.mod(rid, name='xxx_view', info='测试权限11111')
+    r.modify(rid, name='xxx_view', info='测试权限11111')
 
-    rows = r.list()
+    rows = r.query()
 
     allids = ','.join([ x['id'] for x in rows['data']['data']])
 
-    r.mod(allids, info='haha')
+    r.modify(allids, info='haha')
 
-    rows = r.list()
+    rows = r.query()
 
     for row in rows['data']['data']:
         assert row['info'] == 'haha'
 
     one = rows['data']['data'][0]
 
-    rows = r.list(name='perm_mod')
+    rows = r.query(name='perm_mod')
     assert len(rows['data']['data']) == 1
 
-    ret = u.addperm(permid=one['id'])
+    ret = u.perm_give(permid=one['id'])
     permid = ret['data'][0]['permid']
 
-    ret = u.q()
+    ret = u.query(id=userid)
     rows = ret['data']['perm'] 
     permdict =  set([ x['id'] for x in rows])
 
     assert permid in permdict
 
-    u.delperm(permid=one['id'])
-    ret = u.q()
+    u.perm_take(permid=one['id'])
+    ret = u.query(id=userid)
     rows = ret['data']['perm'] 
     permdict =  set([ x['id'] for x in rows])
 
     assert permid not in permdict
 
 
-    ret = u.addperm(permid=allids)
+    ret = u.perm_give(permid=allids)
     assert len(ret['data']) == allids.count(',')+1
 
-    ret = u.q()
+    ret = u.query(id=userid)
     assert len(ret['data']['perm']) == allids.count(',')+1
 
-    ret = u.delperm(permid=allids)
-    ret = u.q()
+    ret = u.perm_take(permid=allids)
+    ret = u.query(id=userid)
     assert len(ret['data']['perm']) == 0
 
 def test_simple():
@@ -588,17 +556,19 @@ def test_simple():
     
     #u.create()
     
-    u.login()
-    #u.q()
-    #u.list()
+    ret = u.signin()
+    userid = ret['data']['id']
+
+    #u.query(userid)
+    #u.query()
 
     #r = Role()
-    #ret = r.list()
+    #ret = r.query()
     #roleid = ret['data']['data'][0]['id']
-    #r.q(roleid)    
+    #r.query(useridroleid)    
 
     #r.addperm(id=roleid, permid=6531811927155317021)
-    #ret = r.q(roleid)    
+    #ret = r.query(useridroleid)    
 
     #rolepermid= ret['data']['perm'][-1]['id']
     #r.delperm(id=roleid, permid=6531811927155317021)
@@ -606,13 +576,13 @@ def test_simple():
     #u2 = User('18800001111', 8888)
     #u2.clear()
     #u2.signup()
-    #u2.list()
+    #u2.query()
 
-    #u.list()
+    #u.query()
 
     #g = Group()
-    #ret = g.list()
-    #g.q(ret['data']['data'][0]['id'])
+    #ret = g.query()
+    #g.query(useridret['data']['data'][0]['id'])
 
     #u = User(appid='wx27edcac7e40b6688')
     #u.clear()
@@ -627,8 +597,9 @@ def main():
     if len(sys.argv) == 2:
         name = sys.argv[1]
 
-    if not name:
+    if not name or name == 'test_user_create':
         test_user_create()
+
     for a in globals().keys():
         if not a.startswith('test'):
             continue
