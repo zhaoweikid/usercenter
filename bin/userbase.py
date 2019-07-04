@@ -4,7 +4,7 @@ import random, hashlib
 import time
 import datetime
 import copy
-from zbase3.web import core, advance
+from zbase3.web import core, advance, httpcore
 from zbase3.web.validator import *
 from zbase3.base import dbpool
 from zbase3.base.dbpool import get_connection
