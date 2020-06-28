@@ -80,7 +80,7 @@ def trans_db(key, data):
         return str(datetime.datetime.fromtimestamp(data))[:19]  
     return data
 
-dbpool.add_trans(['id','ctime','utime'], trans_db)
+#dbpool.add_trans(['id','ctime','utime'], trans_db)
 
 
 def create_password(passwd, salt=None):

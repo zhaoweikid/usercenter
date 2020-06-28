@@ -2,19 +2,19 @@
 
 import os
 import sys
-HOME = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'bin')
+HOME = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # URLS配置
 URLS = None
 
 # 静态路径配置
-STATICS = {'/static/':'/static/'}
+STATICS = {'/admin/': '/'}
 
 # 模板配置
 TEMPLATE = {
     'cache': True,
     'path': 'templates',
-    'tmp': os.path.join(HOME, '../tmp'),
+    'tmp': os.path.join(HOME, 'tmp'),
 }
 
 # APP就是一个子目录
@@ -28,7 +28,7 @@ MIDDLEWARE = (
 )
 
 # WEB根路径
-DOCUMENT_ROOT = HOME
+DOCUMENT_ROOT = os.path.join(os.path.dirname(HOME), 'usercenter_admin')
 
 # 页面编码
 CHARSET = 'UTF-8'
