@@ -48,12 +48,15 @@ STATUS_BAN = 3
 STATUS_DEL = 4
 
 
+# 检查权限
 def check_perm(perms):
     def f(func):
         def _(self, *args, **kwargs):
+            # 超级管理员
             if self.ses.get('isadmin', 0):
                 return func(self, *args, **kwargs)
 
+            # 普通用户检查权限
             p = self.ses.get('allperm')
             if not p:
                 return self.fail(ERR_PERM)
@@ -65,6 +68,7 @@ def check_perm(perms):
         return _
     return f
 
+# 检查是否管理员
 def check_admin(func):
     def _(self, *args, **kwargs):
         if not self.ses['isadmin']:
@@ -73,16 +77,6 @@ def check_admin(func):
     return _
 
   
-def trans_db(key, data):
-    if key == 'id':
-        return str(data)
-    elif key in ['ctime', 'utime'] and isinstance(data, int):
-        return str(datetime.datetime.fromtimestamp(data))[:19]  
-    return data
-
-dbpool.add_trans(['id','ctime','utime'], trans_db)
-
-
 def create_password(passwd, salt=None):
     if salt is None:
         salt = random.randint(1, 1000000)
