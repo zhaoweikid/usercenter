@@ -427,6 +427,9 @@ class UserBase (BaseHandler):
         if user['extend']:
             user['extend'] = json.loads(user['extend'])
 
+        for k in ['group','role','perm','allperm']:
+            convert_data(user[k])
+
         return OK, user
 
     @with_validator([

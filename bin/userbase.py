@@ -73,14 +73,13 @@ def check_admin(func):
     return _
 
   
-def trans_db(key, data):
-    if key == 'id':
-        return str(data)
-    elif key in ['ctime', 'utime'] and isinstance(data, int):
-        return str(datetime.datetime.fromtimestamp(data))[:19]  
-    return data
-
-dbpool.add_trans(['id','ctime','utime'], trans_db)
+#def trans_db(key, data):
+#    if key == 'id':
+#        return str(data)
+#    elif key in ['ctime', 'utime'] and isinstance(data, int):
+#        return str(datetime.datetime.fromtimestamp(data))[:19]  
+#    return data
+#dbpool.add_trans(['id','ctime','utime'], trans_db)
 
 
 def create_password(passwd, salt=None):
@@ -130,24 +129,27 @@ class BaseHandler (advance.APIHandler):
         advance.APIHandler.fail(self, ret, errstr[ret], debug)
 
 
+def convert_data(data):
+    def _convert_row(row):
+        for k in ['id', 'userid', 'groupid', 'roleid', 'permid', 'parentid']:
+            if k in row:
+                row[k] = str(row[k])
+
+        for k in ['ctime','utime']:
+            t = row.get(k)
+            if isinstance(t, int):
+                row[k] = str(datetime.datetime.fromtimestamp(t))[:19]  
+
+    if isinstance(data, dict):
+        _convert_row(data)
+    else:
+        for row in data:
+            _convert_row(row)
+
 
 class BaseObjectHandler (BaseHandler):
     def _convert_data(self, data):
-        def _convert_row(row):
-            for k in ['id', 'userid', 'groupid', 'roleid', 'permid', 'parentid']:
-                if k in row:
-                    row[k] = str(row[k])
-
-            for k in ['ctime','utime']:
-                t = row.get(k)
-                if isinstance(t, int):
-                    row[k] = str(datetime.datetime.fromtimestamp(t))[:19]  
-
-        if isinstance(data, dict):
-            _convert_row(data)
-        else:
-            for row in data:
-                _convert_row(row)
+        return convert_data(data)
 
     @with_validator([F('id',T_INT)])
     def get(self):
