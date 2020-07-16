@@ -75,13 +75,13 @@ CREATE TABLE IF NOT EXISTS settings (
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
 -- 设置密码强度: 1.任意8字符 2.包含数字和英文的8字符 3.包含数字和英文小写、英文大写的8字符 4.包含数字、英文大写、英文小写、其他符号的8字符
-insert into settings(id,name,value,ctime,utime) values (1, 'pwd_strength', '2', now(), now());
+insert into settings(id,name,value,ctime,utime) values (1, 'pwd_strength', '2', UNIX_TIMESTAMP(now()), UNIX_TIMESTAMP(now()));
 -- 密码过期时间, 单位天，为0表示永不过期
-insert into settings(id,name,value,ctime,utime) values (2, 'pwd_expire', '0', now(), now());
+insert into settings(id,name,value,ctime,utime) values (2, 'pwd_expire', '0', UNIX_TIMESTAMP(now()), UNIX_TIMESTAMP(now()));
 -- 10分钟内最大密码错误次数，超过次数后会被锁定
-insert into settings(id,name,value,ctime,utime) values (3, 'pwd_err_count', '3', now(), now());
+insert into settings(id,name,value,ctime,utime) values (3, 'pwd_err_count', '3', UNIX_TIMESTAMP(now()), UNIX_TIMESTAMP(now()));
 -- 密码错误后的锁定时间，单位分钟
-insert into settings(id,name,value,ctime,utime) values (4, 'pwd_lock_time', '10', now(), now());
+insert into settings(id,name,value,ctime,utime) values (4, 'pwd_lock_time', '10', UNIX_TIMESTAMP(now()), UNIX_TIMESTAMP(now()));
 
 -- 用户登录记录
 DROP TABLE `login_record`;
@@ -117,7 +117,7 @@ CREATE TABLE IF NOT EXISTS `roles` (
 	utime int(11) unsigned
 )ENGINE=InnoDB DEFAULT CHARSET=utf8;
 
-insert into roles(id,name,info,ctime,utime) values (1,'admin', '系统管理员', now(), now());
+insert into roles(id,name,info,ctime,utime) values (1,'admin', '系统管理员', UNIX_TIMESTAMP(now()), UNIX_TIMESTAMP(now()));
 
 -- 角色和权限的对应关系表
 DROP TABLE `role_perm`;
