@@ -419,7 +419,7 @@ def test_group():
     ret = u.query(id=userid)
     rows = ret['data']['group'] 
     groupdict =  set([ x['id'] for x in rows])
-
+    print('groupid:', groupid, type(groupid))
     assert groupid in groupdict
 
     u.group_quit(one['id'])
