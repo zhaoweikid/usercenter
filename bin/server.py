@@ -24,6 +24,8 @@ from zbase3.base import dbpool
 from zbase3.web import core
 from zbase3.web import runner
 
+dbpool.settings['id_tostr'] = True
+
 # 导入数据库
 #dbpool.install(config.DATABASE)
 
