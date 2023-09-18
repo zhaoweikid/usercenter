@@ -14,15 +14,22 @@ class Group (BaseObjectHandler):
     dbname = 'usercenter'
     table = 'groups'
 
-    @with_validator([F('name'), F('info'), F('parentid', T_INT)])
+    @with_validator_dict([
+        F('name'), F('info'), F('parentid', T_INT)
+    ])
     def create(self):
         return BaseObjectHandler.create(self)
  
-    @with_validator([F('id', T_INT), F('info'), F('name'), F('parentid', T_INT)])
+    @with_validator_dict([
+        F('id', T_LIST, subs=[
+            F('_', T_INT)
+        ]), 
+        F('info'), F('name'), F('parentid', T_INT)
+    ])
     def modify(self):
         return BaseObjectHandler.modify(self)
 
-    @with_validator([
+    @with_validator_dict([
         F('page',T_INT,default=1), 
         F('pagesize',T_INT,default=20),
         F('name'), 

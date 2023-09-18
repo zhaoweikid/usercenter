@@ -10,12 +10,14 @@ from zbase3.utils import createid
 import logging
 from userbase import *
 import utils
-
+from ucdefines import *
+import opensdk
 
 log = logging.getLogger()
 
 class Ping (BaseHandler):
-    session_nocheck = [
+    dbname = 'usercenter'
+    url_public = [
         '/uc/v1/ping',
     ]
 
@@ -40,8 +42,9 @@ class UserBase (BaseHandler):
                     retdata[row['name']] = row['value']
 
         return retdata
-    
-    @with_validator([
+   
+    # 登录
+    @with_validator_dict([
         F('username'), 
         F('password', must=True), 
         F('email', T_MAIL), 
@@ -55,7 +58,7 @@ class UserBase (BaseHandler):
             mobile   = self.data.get('mobile')
 
             if not username and not email and not mobile:
-                return ERR, 'username/email/mobile must have one'
+                return ERR, 'username/email/mobile至少需要填写一项'
 
             if username:
                 login_key = 'username'
@@ -73,42 +76,50 @@ class UserBase (BaseHandler):
                 ret = conn.select_one(self.table, where, "id,username,email,password,isadmin,status")
                 log.debug('select:%s', ret)
                 if not ret:
-                    return ERR_USER, login_key + ' not found'
+                    log.debug('login key %s error', login_key)
+                    return ERR_USER, login_key + ' 错误'
 
                 # password:   sha1$123456$AJDKLJDLAKJKDLSJKLDJALASASASA
                 px = ret['password'].split('$')
                 pass_enc = create_password(password, int(px[1]))
                 if ret['password'] != pass_enc:
-                    return ERR_AUTH, 'username or password error'
+                    log.debug('password error')
+                    return ERR_AUTH, '用户名或密码错误'
 
                 if ret['status'] != STATUS_OK:
-                    return ERR_AUTH, "status error"
+                    log.debug('status error')
+                    return ERR_AUTH, "用户状态错误"
      
-                conn.update(self.table, {'logtime':int(time.time())}, where={'id':ret['id']})
+                conn.update(self.table, {'logtime':DBFunc('now()')}, 
+                        where={'id':ret['id']})
 
-                retcode, userinfo = self.get_user(ret['id'])
+                retcode, userinfo = self._get_user(ret['id'])
                 log.debug('get user: %d %s', retcode, userinfo)
 
-            sesdata = {
-                'userid':int(ret['id']), 
-                'username':ret['username'], 
-                'isadmin':ret['isadmin'], 
-                'status': userinfo['status'],
-                'allperm':[ x['name'] for x in userinfo['allperm']],
-            }
-            self.ses.update(sesdata)
-            
+            self._signin_set(userinfo, ret)
+
             return OK, userinfo
         except Exception as e:
             log.error(traceback.format_exc())
             return self.fail(ERR, 'Exception:' + str(e))
 
-    @with_validator([
+    def _signin_set(self, userinfo, row):
+        sesdata = {
+            'userid':int(row['id']), 
+            'username':row['username'], 
+            'isadmin':row['isadmin'], 
+            'status': userinfo['status'],
+            'allperm':[ x['name'] for x in userinfo['allperm']],
+        }
+        self.ses.update(sesdata)
+
+    # 通过第三方授权登录
+    @with_validator_dict([
         F('appid', must=True), 
         F('code', must=True),
         F('openid'), 
     ])
-    def signin_3rd(self):
+    def open_signin(self):
         try:
             appid = self.data.get('appid')
             code  = self.data.get('code')
@@ -125,7 +136,7 @@ class UserBase (BaseHandler):
                     'appid': appid,
                     'openid': openid,
                 }
-                ret = conn.select_one('openuser', where, 'userid')
+                ret = conn.select_one('open_user', where, 'userid')
                 if not ret:
                     return ERR_AUTH, 'apppid/openid error'
 
@@ -137,20 +148,16 @@ class UserBase (BaseHandler):
                 if not ret:
                     return ERR_USER, ' appid/openid not found'
 
-                conn.update(self.table, {'logtime':int(time.time())}, where={'id':userid})
+                conn.update(self.table, {'logtime':DBFunc('now()')}, where={'id':userid})
 
-            retcode, userinfo = self.get_user(ret['id'])
-            sesdata = {
-                'userid':int(ret['id']), 
-                'username':ret['username'], 
-                'isadmin':ret['isadmin'], 
-                'status': userinfo['status'],
-                'allperm':[ x['name'] for x in userinfo['allperm']],
+            retcode, userinfo = self._get_user(ret['id'])
+            
+            self._signin_set(userinfo, ret)
+            self.ses.update({
                 'appid':appid,
                 'openid':openid,
                 'plat':config.OPENUSER_ACCOUNT[appid]['plat'],
-            }
-            self.ses.update(sesdata)
+            })
 
             #self.succ({'id':str(ret['id']), 'username':ret['username']})
             return OK, userinfo
@@ -159,7 +166,8 @@ class UserBase (BaseHandler):
             return self.fail(ERR, 'Exception:' + str(e))
 
 
-    @with_validator([
+    # 用户注册
+    @with_validator_dict([
         F('username'), 
         F('password', must=True), 
         F('email', T_MAIL),
@@ -178,7 +186,7 @@ class UserBase (BaseHandler):
             where = {}
             insertdata = {
                 'password': pass_enc,
-                'ctime': int(time.time()),
+                'ctime': DBFunc('now()'),
                 'status': STATUS_OK,  # 默认状态为2
             }
             if email:
@@ -201,32 +209,39 @@ class UserBase (BaseHandler):
                     return ERR_USER, 'username or email or mobile exist'
                 insertdata['id'] = createid.new_id64(conn=conn)
                 conn.insert(self.table, insertdata)
-          
-            # 没有session才能创建新session
-            if not self.ses:
-                self.create_session()
-                log.debug('create sesssion:%s', self.ses.sid)
-                sesdata = {
-                    'userid':int(insertdata['id']), 
-                    'username':username, 
-                    'isadmin':0, 
-                    'status':insertdata['status'],
-                }
-                self.ses.update(sesdata)
 
-            retcode, userinfo = self.get_user(insertdata['id'])
+            userinfo = self._signup_set(insertdata['id'])
+          
             return OK, userinfo
         except Exception as e:
             log.error(traceback.format_exc())
             return self.fail(ERR, 'error:' + str(e))
 
-    @with_validator([
+    def _signup_set(self, userid):
+        retcode, userinfo = self._get_user(userid)
+
+        # 没有session才能创建新session
+        if not self.ses:
+            #self.create_session()
+            log.debug('create sesssion:%s', self.ses.sid)
+            sesdata = {
+                'userid':int(userid), 
+                'username':userinfo['username'], 
+                'isadmin':0, 
+                'status':userinfo['status'],
+            }
+            self.ses.update(sesdata)
+
+        return userinfo
+
+    # 绑定第三方平台账号
+    @with_validator_dict([
         F('appid', must=True), 
         F('code', must=True), 
         F('id', T_INT), 
         F('openid'), 
     ])
-    def signup_3rd_args(self):
+    def bind(self):
         appid = self.data.get('appid')
         code  = self.data.get('code')
         userid= self.data.get('id')
@@ -237,36 +252,24 @@ class UserBase (BaseHandler):
             if not openid:
                 return ERR_AUTH, 'openid error'
             
-        return self.signup_3rd(appid, openid, userid)
+        return self._bind_openuser(appid, openid, userid)
 
-    def signup_3rd(self, appid, openid, userid=None):
+    def _bind_openuser(self, appid, openid, userid=None):
         try:
             where = {
                 'appid':appid,
                 'openid':openid,
             }
-            user_data = {
-                'password': '',
-                'ctime': int(time.time()),
-                'status': STATUS_OK,  # 默认状态为2
-            }
 
             lastid = -1
             with get_connection(self.dbname) as conn:
-                ret = conn.select_one('openuser', where=where, fields='userid')
+                ret = conn.select_one('open_user', where=where, fields='userid')
                 if ret:
                     return ERR_USER, 'user exist'
 
-                if userid:
-                    ret = conn.select_one(self.table, where={'id':userid}, fields='id')
-                    if not ret:
-                        return ERR_USER, 'user error'
-
-                
-                if not userid:
-                    user_data['id'] = createid.new_id64(conn=conn)
-                    user_data['username'] = 'user_%d' % (user_data['id'])
-                    conn.insert(self.table, user_data)
+                ret = conn.select_one(self.table, where={'id':userid}, fields='id')
+                if not ret:
+                    return ERR_USER, 'user error'
 
                 openuser_data = {
                     'id': createid.new_id64(conn=conn),
@@ -274,92 +277,24 @@ class UserBase (BaseHandler):
                     'appid':appid,
                     'openid':openid,
                     'plat':config.OPENUSER_ACCOUNT[appid]['plat'],
-                    'ctime':DBFunc('UNIX_TIMESTAMP(now())'),
+                    'ctime':DBFunc('now()'),
                 }
-                conn.insert('openuser', openuser_data)
+                conn.insert('open_user', openuser_data)
           
-            # 没有session才能创建新session
-            if not self.ses:
-                self.create_session()
-                log.debug('create sesssion:%s', self.ses.sid)
-                sesdata = {
-                    'userid':int(user_data['id']), 
-                    'username':'', 
-                    'isadmin':0, 
-                    'status':user_data['status'],
-                    'appid':appid,
-                    'openid':openid,
-                    'plat':config.OPENUSER_ACCOUNT[appid]['plat'],
-                }
-                self.ses.update(sesdata)
-
-            retcode, userinfo = self.get_user(user_data['id'])
-            return OK, userinfo
+            return OK, {'userid':userid, 'appid':appid, 'openid':openid}
         except Exception as e:
             log.error(traceback.format_exc())
             return self.fail(ERR, 'error:' + str(e))
 
 
-    @with_validator([
-        F('appid', must=True), 
-        F('code', must=True),
-        F('openid'), 
-    ])
-    def signauto_3rd(self):
-        try:
-            appid = self.data.get('appid')
-            code  = self.data.get('code')
-            openid = self.data.get('openid')
-
-            if not openid:
-                openid = utils.get_openid(code, appid)
-                if not openid:
-                    return ERR_AUTH, 'openid error'
-
-            ret = None
-            with get_connection(self.dbname) as conn:
-                where = {
-                    'appid': appid,
-                    'openid': openid,
-                }
-                ret = conn.select_one('openuser', where, 'userid')
-                if not ret: # not found user
-                    return self.signup_3rd(appid, openid)
-
-                userid = ret['userid']
-
-                #log.debug('where:%s', where)
-                ret = conn.select_one(self.table, {'id':userid}, "id,username,email,password,isadmin,status")
-                log.debug('select:%s', ret)
-                if not ret:
-                    return ERR_USER, ' appid/openid not found'
-
-                conn.update(self.table, {'logtime':int(time.time())}, where={'id':userid})
-        
-            retcode, userinfo = self.get_user(ret['id'])
-            sesdata = {
-                'userid':int(ret['id']), 
-                'username':ret['username'], 
-                'isadmin':ret['isadmin'], 
-                'status': userinfo['status'],
-                'allperm':[ x['name'] for x in userinfo['allperm']],
-                'appid':appid,
-                'openid':openid,
-                'plat':config.OPENUSER_ACCOUNT[appid]['plat'],
-            }
-            self.ses.update(sesdata)
-            return OK, userinfo
-        except Exception as e:
-            log.error(traceback.format_exc())
-            return self.fail(ERR, 'Exception:' + str(e))
-
-
-    @with_validator([F('id', T_INT),])
+    # 获取用户信息
+    @with_validator_dict([F('id', T_INT),])
     def get_user_info(self):
         userid_in = self.data.get('id', 0)
         userid  = self.ses.get('userid', 0)
         isadmin = self.ses.get('isadmin', 0)
-        
+       
+        # 非超级管理员，只能获取自己的信息
         if userid_in and  userid != userid_in:
             if not isadmin:
                 log.info('userid_in:%d userid:%d isadmin:%d', userid_in, userid, isadmin)
@@ -367,17 +302,18 @@ class UserBase (BaseHandler):
             else:
                 userid = userid_in
 
-        retcode, data = self.get_user(userid)
+        retcode, data = self._get_user(userid)
         return retcode, data
 
-    def get_user(self, userid):
+    # 获取用户信息，内部调用
+    def _get_user(self, userid):
         userid = int(userid)
 
         where = {'id':userid}
         user = None
         groups = None
-        fields ='id,username,password,email,mobile,head,score,stage,FROM_UNIXTIME(ctime) as ctime,' \
-            'FROM_UNIXTIME(utime) as utime,FROM_UNIXTIME(logtime) as logtime,regip,status,isadmin,extend'
+        fields ='id,username,password,email,mobile,head,score,stage,ctime,' \
+            'utime,logtime,regip,status,isadmin,extend'
         with get_connection(self.dbname) as conn:
             user = conn.select_one(self.table, where, fields=fields)
             if not user:
@@ -432,12 +368,15 @@ class UserBase (BaseHandler):
 
         return OK, user
 
-    @with_validator([
+    # 获取用户列表，只有超级管理员可以
+    @with_validator_dict([
         F('page',T_INT,default=1), 
         F('pagesize',T_INT,default=20),
         F('username'),
         F('mobile', T_MOBILE),
-        F('ctime', T_DATETIME),
+        F('ctime', T_LIST, count=2, subs=[
+            F('_', T_DATETIME)
+        ]),
     ])
     def get_user_list(self):
         if not self.ses.get('isadmin', 0):
@@ -460,12 +399,9 @@ class UserBase (BaseHandler):
             where['mobile'] = mobile
 
         ctime = data.get('ctime')
+        log.debug('ctime: %s', ctime)
         if ctime:
-            where['ctime'] = (
-                'between', 
-                (DBFunc('UNIX_TIMESTAMP("%s")' % ctime[0]), 
-                 DBFunc('UNIX_TIMESTAMP("%s")' % ctime[1]))
-            )
+            where['ctime'] = ['between', ctime]
 
         groups = {}
         roles = {}
@@ -540,7 +476,8 @@ class UserBase (BaseHandler):
         }
         return OK, pagedata
 
-    @with_validator([
+    # 修改用户信息
+    @with_validator_dict([
         F('username'), 
         F('password'), 
         F('mobile', T_MOBILE),
@@ -553,7 +490,8 @@ class UserBase (BaseHandler):
         userid_in = self.data.get('id', 0)
         isadmin = self.ses.get('isadmin', 0)
         userid  = self.ses.get('userid', 0)
-        
+       
+        # 此接口只允许修改自己的信息, 除非是超级管理员
         if userid_in and userid != userid_in:
             if not isadmin:
                 return ERR_PERM, 'permission deny'
@@ -578,7 +516,7 @@ class UserBase (BaseHandler):
             log.info('no modify info')
             return ERR_PARAM, 'not modify'
 
-        values['utime'] = DBFunc("UNIX_TIMESTAMP(now())")
+        values['utime'] = DBFunc("now()")
 
         with get_connection(self.dbname) as conn:
             ret = conn.update(self.table, values, where)
@@ -590,7 +528,8 @@ class UserBase (BaseHandler):
 
         return OK, ret
 
-    @with_validator([
+    # 把用户加入某个用户组
+    @with_validator_dict([
         F('groupid', T_INT, must=True),
         F('userid', T_INT),
     ])
@@ -607,14 +546,13 @@ class UserBase (BaseHandler):
         
         groupid = self.data.get('groupid')
        
-        t = int(time.time())
         with get_connection(self.dbname) as conn:
             data = {
                 'id': createid.new_id64(conn=conn),
                 'userid':userid,
                 'groupid':groupid,
-                'ctime':t,
-                'utime':t,
+                'ctime':DBFunc('now()'),
+                'utime':DBFunc('now()'),
             }
             ret = conn.insert('user_group', data)
             if ret != 1:
@@ -625,8 +563,8 @@ class UserBase (BaseHandler):
                 ret[k] = str(ret[k])
             return OK, ret
 
-
-    @with_validator([F('groupid', T_INT, must=True)])
+    # 把用户从用户组中删除
+    @with_validator_dict([F('groupid', T_INT, must=True)])
     def group_quit(self):
         isadmin = self.ses.get('isadmin', 0)
         groupid = self.data.get('groupid')
@@ -642,12 +580,17 @@ class UserBase (BaseHandler):
             ret = conn.delete('user_group', where=where)
             return OK, ret
 
-    @with_validator([
-        F('permid', T_INT, default=0), 
-        F('roleid', T_INT, default=0),
+    # 分配权限
+    @with_validator_dict([
+        F('permid', T_LIST, subs=[
+            F('_', T_INT),
+        ]), 
+        F('roleid', T_LIST, subs=[
+            F('_', T_INT),
+        ]),
         F('userid', T_INT),
     ])
-    def perm_give(self):
+    def perm_alloc(self):
         isadmin = self.ses.get('isadmin', 0)
         userid = self.ses['userid']
         in_userid = self.data.get('userid')
@@ -658,26 +601,24 @@ class UserBase (BaseHandler):
             else:
                 userid = in_userid
  
-        roleid = self.data.get('roleid')
-        permid = self.data.get('permid')
+        roleid = self.data.get('roleid', 0)
+        permid = self.data.get('permid', 0)
             
         items = []
         for k in ['roleid', 'permid']:
             v = self.data.get(k)
             if not v:
                 continue
-            log.debug('%s: %s', k, v)
             if isinstance(v, (list,tuple)):
-                for one in v:
+                for a in v:
                     data = {'roleid':0, 'permid':0}
-                    data[k] = one
+                    data[k] = a
                     items.append(data)
             else:
                 data = {'roleid':0, 'permid':0}
                 data[k] = v
                 items.append(data)
 
-        t = int(time.time())
         with get_connection(self.dbname) as conn:
             ids = []
             for item in items:
@@ -686,8 +627,8 @@ class UserBase (BaseHandler):
                     'userid':userid,
                     'roleid':item['roleid'],
                     'permid':item['permid'],
-                    'ctime':t,
-                    'utime':t,
+                    'ctime':DBFunc('now()'),
+                    'utime':DBFunc('now()'),
                 }
                 ids.append(data['id'])
 
@@ -702,13 +643,14 @@ class UserBase (BaseHandler):
 
             return OK, ret
 
-
-    @with_validator([
-        F('permid', T_INT, default=0), 
-        F('roleid', T_INT, default=0),
+    
+    # 取消权限
+    @with_validator_dict([
+        F('permid', T_LIST, subs=[F('_', T_INT)]), 
+        F('roleid', T_LIST, subs=[F('_', T_INT)]),
         F('userid', T_INT),
     ])
-    def perm_take(self):
+    def perm_cancel(self):
         isadmin = self.ses.get('isadmin', 0)
         userid = self.data.get('userid', 0)
         #userid = self.ses.get('userid', 0)
@@ -722,10 +664,7 @@ class UserBase (BaseHandler):
         for k in ['roleid','permid']:
             v = self.data.get(k)
             if v:
-                if isinstance(v, (list,tuple)):
-                    where[k] = ('in', v)
-                else:
-                    where[k] = v
+                where[k] = ('in', v)
 
         with get_connection(self.dbname) as conn:
             ret = conn.delete('user_perm', where=where)
@@ -733,16 +672,15 @@ class UserBase (BaseHandler):
 
 
 class User (UserBase):
-    session_nocheck = [
-        '/uc/v1/user/signup',
-        '/uc/v1/user/signup_3rd',
+    url_public = [
         '/uc/v1/user/signin',
-        '/uc/v1/user/signin_3rd',
-        '/uc/v1/user/signauto_3rd',
+        '/uc/v1/user/signup',
+        '/uc/v1/user/open_signin',
     ]
 
     def query(self):
-        data = self.req.input()
+        data = self.input()
+        log.debug('query data: %s', data)
         if data.get('id'):
             return self.get_user_info()
         else:
@@ -757,13 +695,4 @@ class User (UserBase):
     def error(self, data):
         self.fail(ERR_PARAM)
 
-    def input(self):
-        data = self.req.input()
-        if data:
-            return data
-        return self.req.inputjson()
-
-
- 
-
-      
+     

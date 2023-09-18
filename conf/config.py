@@ -15,7 +15,8 @@ PORT = 6201
 DEBUG = False
 
 # 日志文件配置
-LOGFILE = os.path.join(HOME, '../log/usercenter.log')
+#LOGFILE = os.path.join(HOME, 'log/usercenter.log')
+LOGFILE = 'stdout'
 
 # 数据库配置
 DATABASE = {
@@ -24,7 +25,7 @@ DATABASE = {
         'db': 'usercenter',
         'host': '127.0.0.1',
         'port': 3306,
-        'user': 'root',
+        'user': 'zhaowei',
         'passwd': '123456',
         'charset': 'utf8',
         'conn': 10,
@@ -45,4 +46,13 @@ OPENUSER_ACCOUNT = {
         'plat':'wxmicro',
     }
 }
+
+OPENSDK_SIGN_VAR = {
+    'appid': 'X-Appid',
+    'sign': 'X-Sign',
+    'method': 'X-Method',
+}
+
+
+
 

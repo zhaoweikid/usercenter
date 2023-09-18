@@ -7,45 +7,14 @@ import copy
 from zbase3.web import core, advance, httpcore
 from zbase3.web.validator import *
 from zbase3.base import dbpool
-from zbase3.base.dbpool import get_connection
+from zbase3.base.dbpool import get_connection, DBFunc
 from zbase3.utils import createid
 import config
 import json
 import logging
+from ucdefines import *
 
 log = logging.getLogger()
-
-OK  = 0
-ERR = -1
-ERR_USER    = -2
-ERR_PARAM   = -3
-ERR_AUTH    = -4
-ERR_ACTION  = -5
-ERR_DATA    = -6
-ERR_PERM    = -7
-ERR_INTERNAL= -8
-
-errstr = {
-    OK: '成功',
-    ERR: '失败',
-    ERR_USER: '用户错误',
-    ERR_PARAM: '参数错误',
-    ERR_AUTH: '认证失败',
-    ERR_ACTION: '操作失败',
-    ERR_DATA: '数据错误',
-    ERR_PERM: '权限错误',
-    ERR_INTERNAL: '内部错误',
-}
-
-
-# 未认证
-STATUS_NOAUTH = 1
-# 正常
-STATUS_OK  = 2
-# 封禁
-STATUS_BAN = 3
-# 删除
-STATUS_DEL = 4
 
 
 # 检查权限
@@ -94,26 +63,8 @@ def create_password(passwd, salt=None):
     return 'sha1$%s$%s' % (salt, hashlib.sha1(tmp.encode('utf-8')).hexdigest())
 
 class BaseHandler (advance.APIHandler):
-    session_conf = config.SESSION
-
-    def GET(self, name):
-        log.warn('====== GET %s %s ======', self.req.path, self.req.query_string)
-        if name != 'query':
-            return httpcore.NotFound()
-
-        try:
-            code, ret = self.query()
-
-            if code == OK:
-                return self.succ(ret)
-            else:
-                return self.fail(code, ret)
-        except:
-            log.error(traceback.format_exc())
-            return self.fail(ERR_INTERNAL)
-
     def POST(self, name=None):
-        log.warn('====== POST %s %s ======', self.req.path, self.req.query_string)
+        log.warn('====== %s %s ======', self.req.path, self.req.query_string)
         
         try:
             func = getattr(self, name, None)
@@ -122,15 +73,29 @@ class BaseHandler (advance.APIHandler):
             code, ret = func()
 
             if code == OK:
-                return self.succ(ret)
+                self.succ(ret)
             else:
-                return self.fail(code, ret)
+                self.fail(code, ret)
+        except ValidatorError as e:
+            pass
         except:
             log.error(traceback.format_exc())
-            return self.fail(ERR_INTERNAL)
+            self.fail(ERR_INTERNAL)
+
+    GET = POST
        
-    def fail(self, ret, debug=''):
-        advance.APIHandler.fail(self, ret, errstr[ret], debug)
+    def _errcode(self, code):
+        return code
+        #return '{:04d}'.format(abs(code))
+ 
+    def input(self):
+        s = self.req.postdata()
+        log.debug('postdata:%s', s)
+        if not s:
+            raise HandlerFinish(400, '输入数据错误')
+        return json.loads(s)
+
+ 
 
 
 def convert_data(data):
@@ -138,11 +103,6 @@ def convert_data(data):
         for k in ['id', 'userid', 'groupid', 'roleid', 'permid', 'parentid']:
             if k in row:
                 row[k] = str(row[k])
-
-        for k in ['ctime','utime']:
-            t = row.get(k)
-            if isinstance(t, int):
-                row[k] = str(datetime.datetime.fromtimestamp(t))[:19]  
 
     if isinstance(data, dict):
         _convert_row(data)
@@ -165,8 +125,6 @@ class BaseObjectHandler (BaseHandler):
             return OK, ret
 
 
-    #@with_validator([F('page',T_INT,default=1), F('pagesize',T_INT,default=20)])
-    # 必须自己定义装饰器来限制参数
     def get_list(self):
         where = {}
         for k in self.data:
@@ -200,10 +158,10 @@ class BaseObjectHandler (BaseHandler):
 
     def create(self):
         data = self.validator.data
-        t = int(time.time())
+        #t = int(time.time())
         for k in ['ctime']:
             if k not in data:
-                data[k] = t
+                data[k] = DBFunc('now()')
                 
         with get_connection(self.dbname) as conn:
             if not data.get('id'):
@@ -222,14 +180,14 @@ class BaseObjectHandler (BaseHandler):
             return ERR_PARAM, 'param error'
 
         xid = data.pop('id')
-        if isinstance(xid, (list, tuple)):
-            xid = ('in', xid)
+        #if isinstance(xid, (list, tuple)):
+        #    xid = ('in', xid)
 
         if not data:
             return ERR_PARAM, 'no data'
 
         with get_connection(self.dbname) as conn:
-            ret = conn.update(self.table, data, where={'id':xid})
+            ret = conn.update(self.table, data, where={'id':('in', xid)})
             if ret >= 1:
                 data['_rows'] = ret
                 if not isinstance(xid, (list, tuple)):

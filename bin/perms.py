@@ -30,15 +30,20 @@ class Perm (BaseObjectHandler):
     def POST(self, name):
         return BaseObjectHandler.POST(self, name)
 
-    @with_validator([F('name'), F('info')])
+    @with_validator_dict([F('name'), F('info')])
     def create(self):
         return BaseObjectHandler.create(self)
  
-    @with_validator([F('id', T_INT), F('name'), F('info')])
+    @with_validator_dict([
+        F('id', T_LIST, subs=[
+            F("_", T_INT),
+        ]), 
+        F('name'), F('info')
+    ])
     def modify(self):
         return BaseObjectHandler.modify(self)
 
-    @with_validator([
+    @with_validator_dict([
         F('page',T_INT,default=1), 
         F('pagesize',T_INT,default=20),
         F('name'), 
@@ -102,16 +107,21 @@ class Role (BaseObjectHandler):
         return retcode, retdata
 
  
-    @with_validator([F('id', T_INT, must=True), F('permid', T_INT, must=True) ])
-    def perm_give(self):
+    @with_validator_dict([
+        F('id', T_LIST, must=True, subs=[
+            F('_', T_INT),
+        ]), 
+        F('permid', T_INT, must=True) 
+    ])
+    def perm_alloc(self):
         permid = self.data.get('permid')
         
         values = []
         if isinstance(permid, (list, tuple)):
             for p in permid:
-                values.append({'permid':p, 'roleid':self.data.get('id'), 'ctime':DBFunc('UNIX_TIMESTAMP(now())'), 'utime':DBFunc('UNIX_TIMESTAMP(now())')})
+                values.append({'permid':p, 'roleid':self.data.get('id'), 'ctime':DBFunc('now()'), 'utime':DBFunc('now()')})
         else:
-            values.append({'permid':permid, 'roleid':self.data.get('id'), 'ctime':DBFunc('UNIX_TIMESTAMP(now())'), 'utime':DBFunc('UNIX_TIMESTAMP(now())')})
+            values.append({'permid':permid, 'roleid':self.data.get('id'), 'ctime':DBFunc('now()'), 'utime':DBFunc('now()')})
 
         with get_connection(self.dbname) as conn:
             for value in values:
@@ -120,8 +130,14 @@ class Role (BaseObjectHandler):
 
         return OK, {'rows':len(values)}
 
-    @with_validator([F('id', T_INT), F('permid', T_INT), F('roleperm_id', T_INT)  ])
-    def perm_take(self):
+    @with_validator_dict([
+        F('id', T_LIST, subs=[
+            F('_', T_INT)
+        ]), 
+        F('permid', T_INT), 
+        F('roleperm_id', T_INT)  
+    ])
+    def perm_cancel(self):
         roleid = self.data.get('id')
         permid = self.data.get('permid')
         roleperm_id = self.data.get('roleperm_id')
@@ -152,15 +168,22 @@ class Role (BaseObjectHandler):
     def POST(self, name):
         return BaseObjectHandler.POST(self, name)
 
-    @with_validator([F('name'), F('info')])
+    @with_validator_dict([
+        F('name'), F('info')
+    ])
     def create(self):
         return BaseObjectHandler.create(self)
  
-    @with_validator([F('id', T_INT), F('name'), F('info')])
+    @with_validator_dict([
+        F('id', T_LIST, subs=[
+            F('_', T_INT)
+        ]), 
+        F('name'), F('info')
+    ])
     def modify(self):
         return BaseObjectHandler.modify(self)
  
-    @with_validator([
+    @with_validator_dict([
         F('page',T_INT,default=1), 
         F('pagesize',T_INT,default=20),
         F('name'), 
