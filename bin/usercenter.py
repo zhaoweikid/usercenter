@@ -47,7 +47,7 @@ class UserBase (BaseHandler):
     @with_validator_dict([
         F('username'), 
         F('password', must=True), 
-        F('email', T_MAIL), 
+        F('email', T_EMAIL), 
         F('mobile', T_MOBILE),
     ])
     def signin(self):
@@ -170,7 +170,7 @@ class UserBase (BaseHandler):
     @with_validator_dict([
         F('username'), 
         F('password', must=True), 
-        F('email', T_MAIL),
+        F('email', T_EMAIL),
         F('mobile', T_MOBILE),
     ])
     def signup(self):
