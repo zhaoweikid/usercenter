@@ -32,7 +32,7 @@ DROP TABLE apps;
 CREATE TABLE IF NOT EXISTS apps (
 	id bigint(20) not null primary key AUTO_INCREMENT,
 	userid bigint(20) not null,
-	appid varchar(256) not null unique COMMENT '开放平台账号',
+	appid varchar(128) not null unique COMMENT '开放平台账号',
 	pubkey varchar(1024) COMMENT '公钥',
 	prikey varchar(4096) COMMENT '私钥',
 	secret varchar(256) not null COMMENT '开放平台签名密钥',
