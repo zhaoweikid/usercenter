@@ -1,7 +1,7 @@
 -- DROP DATABASE usercenter;
--- CREATE DATABASE usercenter CHARSET utf8 COLLATE utf8_general_ci;
+CREATE DATABASE usercenter CHARSET utf8 COLLATE utf8_general_ci;
 USE usercenter;
-SET NAMES utf8;
+SET NAMES utf8mb4;
 
 -- 用户表
 DROP TABLE users;
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS users (
 	isadmin tinyint default 0 COMMENT '是否为超级管理员 1是 0否',
 	extend varchar(8192) COMMENT '扩展字段，存储json数据',
 	key (username, email, mobile)
-)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 insert into users(id,username,password,ctime,status,isadmin) values (1,'admin','sha1$123456$71dd07494c5ee54992a27746d547e25dee01bd97',now(),2,1);
 
@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS apps (
 	method varchar(64) not null default 'md5' COMMENT '验证方法 md5/sha256/rsa',
 	ctime datetime COMMENT '创建时间',
 	utime datetime COMMENT '更新时间'
-)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 -- 第三方系统账号, 用于授权登录
@@ -55,7 +55,7 @@ CREATE TABLE IF NOT EXISTS open_account (
 	status tinyint default 1 COMMENT '状态: 1.正常 2.停用',
 	ctime datetime,
 	utime datetime
-)ENGINE=InnoDB DEFAULT CHARSET=utf8; 
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 
 
 -- 第三方系统授权登录后，记录的用户信息
 DROP TABLE open_user;
@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS open_user (
 	ctime datetime,
 	utime datetime,
 	key (appid, openid)
-)ENGINE=InnoDB DEFAULT CHARSET=utf8; 
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 
 
 -- 用户组，同时表示了组织关系
 DROP TABLE groups;
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS groups (
     info varchar(128) COMMENT '组描述',
 	ctime datetime,
 	utime datetime
-)ENGINE=InnoDB DEFAULT CHARSET=utf8; 
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4; 
 
 -- 用户和组的关系
 DROP TABLE user_group;
@@ -88,7 +88,8 @@ CREATE TABLE IF NOT EXISTS user_group (
 	groupid bigint(20) not null,
 	ctime datetime,
 	utime datetime
-)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 insert into user_group(id,userid,groupid,ctime) values (1,1,1,now());
 
 
@@ -102,7 +103,7 @@ CREATE TABLE IF NOT EXISTS settings (
 	ctime datetime,
 	utime datetime,
 	key (name)
-)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 设置密码强度: 1.任意8字符 2.包含数字和英文的8字符 3.包含数字和英文小写、英文大写的8字符 4.包含数字、英文大写、英文小写、其他符号的8字符
 insert into settings(id,name,value,ctime,utime) values (1, 'pwd_strength', '2', now(), now());
@@ -123,7 +124,7 @@ CREATE TABLE IF NOT EXISTS `login_record` (
 	state smallint not null default 1 COMMENT '登录结果，1.成功 0.失败',
 	memo varchar(512) COMMENT '其他信息',
 	ctime datetime
-)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 权限表
 DROP TABLE `perms`;
@@ -133,7 +134,7 @@ CREATE TABLE IF NOT EXISTS `perms` (
     info varchar(128) COMMENT '权限描述',
 	ctime datetime,
 	utime datetime
-)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 insert into perms(id,name,info) values (1,'perm_view','权限查看');
 insert into perms(id,name,info) values (2,'perm_mod','权限增加修改');
@@ -146,7 +147,7 @@ CREATE TABLE IF NOT EXISTS `roles` (
     info varchar(128) COMMENT '角色描述',
 	ctime datetime,
 	utime datetime
-)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 insert into roles(id,name,info,ctime,utime) values (1,'admin', '系统管理员', now(), now());
 
@@ -159,7 +160,7 @@ CREATE TABLE IF NOT EXISTS `role_perm` (
 	ctime datetime,
 	utime datetime,
 	UNIQUE KEY `rp_uniq_id` (`permid`, `roleid`)
-)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- 用户和权限、角色的关系表
 -- 用户既可以对应角色，也可以对应权限。实际处理会拿到角色对应的所有权限，和直接分配的权限合并在一起
@@ -171,7 +172,7 @@ CREATE TABLE IF NOT EXISTS user_perm (
 	roleid bigint(20) not null default 0 COMMENT '角色id，为0表示无角色',
 	ctime datetime,
 	utime datetime
-)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+)ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 
 

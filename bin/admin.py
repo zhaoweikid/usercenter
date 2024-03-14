@@ -8,10 +8,11 @@ from zbase3.web.validator import *
 from zbase3.base.dbpool import get_connection
 from zbase3.utils import createid
 import logging
+import config
 from userbase import *
 
 class Admin (BaseObjectHandler):
-    dbname = 'usercenter'
+    dbname = config.DBNAME
     table = 'perms'
 
  

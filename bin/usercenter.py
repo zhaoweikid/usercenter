@@ -12,11 +12,12 @@ from userbase import *
 import utils
 from ucdefines import *
 import opensdk
+import config
 
 log = logging.getLogger()
 
 class Ping (BaseHandler):
-    dbname = 'usercenter'
+    dbname = config.DBNAME
     url_public = [
         '/uc/v1/ping',
     ]
@@ -28,7 +29,7 @@ class Ping (BaseHandler):
 
 class UserBase (BaseHandler):
     table  = 'users'
-    dbname = 'usercenter'
+    dbname = config.DBNAME
 
     @cache.with_cache(60)
     def settings(self):

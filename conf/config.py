@@ -18,9 +18,12 @@ DEBUG = False
 #LOGFILE = os.path.join(HOME, 'log/usercenter.log')
 LOGFILE = 'stdout'
 
+# 数据库别名
+DBNAME = 'usercenter'
+
 # 数据库配置
 DATABASE = {
-    'usercenter': {
+    DBNAME: {
         'engine':'pymysql',
         'db': 'usercenter',
         'host': '127.0.0.1',

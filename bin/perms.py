@@ -8,6 +8,7 @@ from zbase3.web.validator import *
 from zbase3.base.dbpool import get_connection, DBFunc
 from zbase3.utils import createid
 import logging
+import config
 from userbase import *
 
 # 权限命名规则
@@ -19,7 +20,7 @@ from userbase import *
 # 其他 xxxx_abc
 
 class Perm (BaseObjectHandler):
-    dbname = 'usercenter'
+    dbname = config.DBNAME
     table = 'perms'
 
     @check_perm(['perm_view'])
@@ -54,7 +55,7 @@ class Perm (BaseObjectHandler):
  
  
 class Role (BaseObjectHandler):
-    dbname = 'usercenter'
+    dbname = config.DBNAME
     table = 'roles'
 
     @check_perm(['perm_view'])
