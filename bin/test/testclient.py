@@ -86,10 +86,10 @@ def request(url, values=None, method='POST', **options):
             cookie = c.split(';')[0]
             print('cookie:', cookie)
 
-        print(respdata)
+        print('respdata:', respdata)
         ret = json.loads(respdata)
         #pprint.pprint(ret)
-        print(json.dumps(ret, indent=2))
+        print('formated:', json.dumps(ret, indent=2, ensure_ascii=False))
 
     return ret
 
@@ -302,7 +302,7 @@ class Group (Base):
             #data['id__in'] = xid
             data['id'] = xid.split(',')
         else:
-            data['id'] = xid
+            data['id'] = [xid,]
         data.update(args)
 
         return request(url, data, appid=self.user.appid, secret=self.user.secret)
@@ -359,16 +359,18 @@ def test_user_create():
     #print(ret)
 
     ret = u.signin()
-    print(ret)
+    #print(ret)
     userid = ret['data']['id']
+    assert int(userid) == u.userid
 
     u.user_db()
     last = u.get_last('users')
-    print('last:', last['id'], ' signup:', ret['data']['id'])
+    print('last userid:', last['id'], ' signup userid:', ret['data']['id'])
     assert last['id'] == int(ret['data']['id'])
     print('='*20, 'signup ok', '='*20)
 
-    print(u.query(id=userid))
+    ret = u.query(id=userid)
+    assert ret['data']['id'] == userid
 
 def test_user_list():
     global u
@@ -464,14 +466,14 @@ def test_group():
     ret = gp.create(name="组2", info="测试组2", parentid=0)
     ret = gp.create(name="组3", info="测试组3", parentid=0)
 
-
+    # 组3的id
     gpid = ret['data']['id']
 
     gp.modify(gpid, name='组11', info='测试组11111')
 
     rows = gp.query()
 
-    allids = ','.join([ x['id'] for x in rows['data']['data']])
+    allids = ','.join([ str(x['id']) for x in rows['data']['data']])
 
     gp.modify(allids, info='haha')
 
@@ -485,15 +487,17 @@ def test_group():
     rows = gp.query(name='组2')
     assert len(rows['data']['data']) == 1
 
+    # 加入组1
     ret = u.group_join(one['id'])
     groupid = ret['data']['groupid']
 
     ret = u.query(id=userid)
     rows = ret['data']['group'] 
     groupdict =  set([ x['id'] for x in rows])
-    print('groupid:', groupid, type(groupid))
-    assert groupid in groupdict
+    print('groupid:', groupid, type(groupid), 'groupdict:', groupdict)
+    assert int(groupid) in groupdict
 
+    # 退出组
     u.group_quit(one['id'])
     ret = u.query(id=userid)
     rows = ret['data']['group'] 
@@ -518,12 +522,13 @@ def test_role():
     ret = r.create(name="角色3", info="测试角色3")
 
     rid = ret['data']['id']
-
+    
+    # 角色3修改为角色11
     r.modify(rid, name='角色11', info='测试角色11111')
 
     rows = r.query()
 
-    allids = ','.join([ x['id'] for x in rows['data']['data']])
+    allids = ','.join([ str(x['id']) for x in rows['data']['data']])
 
     r.modify(allids, info='haha')
 
@@ -544,14 +549,14 @@ def test_role():
     rows = ret['data']['role'] 
     roledict =  set([ x['id'] for x in rows])
 
-    assert roleid in roledict
+    assert int(roleid) in roledict
 
     u.perm_cancel(roleid=[one['id'],])
     ret = u.query(id=userid)
     rows = ret['data']['role'] 
     roledict =  set([ x['id'] for x in rows])
 
-    assert roleid not in roledict
+    assert int(roleid) not in roledict
 
     u.perm_alloc(roleid=allids.split(','))
     ret = u.query(id=userid)
@@ -582,7 +587,7 @@ def test_perm():
 
     rows = r.query()
 
-    allids = ','.join([ x['id'] for x in rows['data']['data']])
+    allids = ','.join([ str(x['id']) for x in rows['data']['data']])
 
     r.modify(allids, info='haha')
 
@@ -603,14 +608,14 @@ def test_perm():
     rows = ret['data']['perm'] 
     permdict =  set([ x['id'] for x in rows])
 
-    assert permid in permdict
+    assert int(permid) in permdict
 
     u.perm_cancel(permid=[one['id'],])
     ret = u.query(id=userid)
     rows = ret['data']['perm'] 
     permdict =  set([ x['id'] for x in rows])
 
-    assert permid not in permdict
+    assert int(permid) not in permdict
 
 
     ret = u.perm_alloc(permid=allids.split(','))

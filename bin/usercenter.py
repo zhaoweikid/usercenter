@@ -59,7 +59,8 @@ class UserBase (BaseHandler):
             mobile   = self.data.get('mobile')
 
             if not username and not email and not mobile:
-                return ERR, 'username/email/mobile至少需要填写一项'
+                self.fail(ERR, 'username/email/mobile至少需要填写一项')
+                return
 
             if username:
                 login_key = 'username'
@@ -78,18 +79,21 @@ class UserBase (BaseHandler):
                 log.debug('select:%s', ret)
                 if not ret:
                     log.debug('login key %s error', login_key)
-                    return ERR_USER, login_key + ' 错误'
+                    self.fail(ERR_USER, login_key + ' 错误')
+                    return
 
                 # password:   sha1$123456$AJDKLJDLAKJKDLSJKLDJALASASASA
                 px = ret['password'].split('$')
                 pass_enc = create_password(password, int(px[1]))
                 if ret['password'] != pass_enc:
                     log.debug('password error')
-                    return ERR_AUTH, '用户名或密码错误'
+                    self.fail(ERR_AUTH, '用户名或密码错误')
+                    return
 
                 if ret['status'] != STATUS_OK:
                     log.debug('status error')
-                    return ERR_AUTH, "用户状态错误"
+                    self.fail(ERR_AUTH, "用户状态错误")
+                    return
      
                 conn.update(self.table, {'logtime':DBFunc('now()')}, 
                         where={'id':ret['id']})
@@ -102,7 +106,8 @@ class UserBase (BaseHandler):
             return OK, userinfo
         except Exception as e:
             log.error(traceback.format_exc())
-            return self.fail(ERR, 'Exception:' + str(e))
+            self.fail(ERR, 'Exception:' + str(e))
+            return
 
     def _signin_set(self, userinfo, row):
         sesdata = {
@@ -164,7 +169,8 @@ class UserBase (BaseHandler):
             return OK, userinfo
         except Exception as e:
             log.error(traceback.format_exc())
-            return self.fail(ERR, 'Exception:' + str(e))
+            self.fail(ERR, 'Exception:' + str(e))
+            return
 
 
     # 用户注册
@@ -216,7 +222,8 @@ class UserBase (BaseHandler):
             return OK, userinfo
         except Exception as e:
             log.error(traceback.format_exc())
-            return self.fail(ERR, 'error:' + str(e))
+            self.fail(ERR, 'error:' + str(e))
+            return
 
     def _signup_set(self, userid):
         retcode, userinfo = self._get_user(userid)
@@ -285,7 +292,8 @@ class UserBase (BaseHandler):
             return OK, {'userid':userid, 'appid':appid, 'openid':openid}
         except Exception as e:
             log.error(traceback.format_exc())
-            return self.fail(ERR, 'error:' + str(e))
+            self.fail(ERR, 'error:' + str(e))
+            return
 
 
     # 获取用户信息
@@ -321,6 +329,8 @@ class UserBase (BaseHandler):
                 return ERR_USER, 'not have user info'
 
             groups = conn.query('select g.id as id,g.name as name from user_group ug, groups g where g.id=ug.groupid and ug.userid=%d' % userid)
+            if not groups:
+                groups = []
             user['group'] = groups     
 
             user['role'] = []
@@ -363,9 +373,11 @@ class UserBase (BaseHandler):
         
         if user['extend']:
             user['extend'] = json.loads(user['extend'])
+        else:
+            user['extend'] = {}
 
-        for k in ['group','role','perm','allperm']:
-            convert_data(user[k])
+        #for k in ['group','role','perm','allperm']:
+        #    convert_data(user[k])
 
         return OK, user
 
@@ -419,27 +431,29 @@ class UserBase (BaseHandler):
             ret = conn.query(sql)
             log.debug('groups:%s', ret)
 
-            for row in ret:
-                uid = row['userid']
-                items = groups.get(uid)
-                if not items:
-                    items = []
-                    groups[uid] = items
-                items.append({'id':str(row['groupid']), 'name':row['name'], 'info':row['info']})
+            if ret:
+                for row in ret:
+                    uid = row['userid']
+                    items = groups.get(uid)
+                    if not items:
+                        items = []
+                        groups[uid] = items
+                    items.append({'id':str(row['groupid']), 'name':row['name'], 'info':row['info']})
 
             # 获取权限
             sql = "select up.userid as userid, up.permid as permid, p.name as name, p.info as info from user_perm as up,perms as p " \
                   "where up.userid in (%s) and up.permid=p.id" % (useridstr)
             ret = conn.query(sql)
             log.debug('perms:%s', ret)
-            
-            for row in ret:
-                uid = row['userid']
-                items = perms.get(uid)
-                if not items:
-                    items = []
-                    perms[uid] = items
-                items.append({'id':str(row['permid']), 'name':row['name'], 'info':row['info']})
+           
+            if ret:
+                for row in ret:
+                    uid = row['userid']
+                    items = perms.get(uid)
+                    if not items:
+                        items = []
+                        perms[uid] = items
+                    items.append({'id':str(row['permid']), 'name':row['name'], 'info':row['info']})
 
             # 获取角色
             sql = "select up.userid as userid, up.roleid as roleid, r.name as name, r.info as info from user_perm as up,roles as r " \
@@ -447,14 +461,15 @@ class UserBase (BaseHandler):
 
             ret = conn.query(sql)
             log.debug('roles:%s', ret)
-            
-            for row in ret:
-                uid = row['userid']
-                items = roles.get(uid)
-                if not items:
-                    items = []
-                    roles[uid] = items
-                items.append({'id':str(row['roleid']), 'name':row['name'], 'info':row['info']})
+           
+            if ret:
+                for row in ret:
+                    uid = row['userid']
+                    items = roles.get(uid)
+                    if not items:
+                        items = []
+                        roles[uid] = items
+                    items.append({'id':str(row['roleid']), 'name':row['name'], 'info':row['info']})
 
 
         pdata = page.pagedata.data
@@ -472,7 +487,7 @@ class UserBase (BaseHandler):
         pagedata = {
             'page':page.page, 
             'pagesize':page.page_size, 
-            'pagenum':page.pages, 
+            'pagecount':page.pages, 
             'data':pdata,
         }
         return OK, pagedata

@@ -26,8 +26,18 @@ APPS = (
 MIDDLEWARE = (
     # middleware
     'SessionMiddleware',
-    'SignMiddleware',
+    #'SignMiddleware',
 )
+
+# 中间件配置
+MIDDLEWARE_CONF = {
+    'SignMiddleware': {
+        'apps':{  # appid: {userid:xx, secret:xx}
+        },
+    },
+    'SessionMiddleware': {
+    }
+}
 
 # WEB根路径
 DOCUMENT_ROOT = os.path.join(os.path.dirname(HOME), 'usercenter_admin')

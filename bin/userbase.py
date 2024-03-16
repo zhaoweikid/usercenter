@@ -70,12 +70,13 @@ class BaseHandler (advance.APIHandler):
             func = getattr(self, name, None)
             if not func:
                 return httpcore.NotFound()
-            code, ret = func()
-
-            if code == OK:
-                self.succ(ret)
-            else:
-                self.fail(code, ret)
+            result = func()
+            if isinstance(result, (list,tuple)):
+                code, ret = result
+                if code == OK:
+                    self.succ(ret)
+                else:
+                    self.fail(code, ret)
         except ValidatorError as e:
             pass
         except:
@@ -120,8 +121,8 @@ class BaseObjectHandler (BaseHandler):
         xid = self.data.get('id')
         with get_connection(self.dbname) as conn:
             ret = conn.select_one(self.table, where={'id':xid})
-            if ret:
-                self._convert_data(ret)
+            #if ret:
+            #    self._convert_data(ret)
             return OK, ret
 
 
@@ -143,14 +144,14 @@ class BaseObjectHandler (BaseHandler):
     
     def get_data(self, page, pagesize, where=None):
         log.debug('list page:%s pagesize:%s', str(page), str(pagesize))
-        retdata = {'page':page, 'pagesize':pagesize, 'pagenum':0}
+        retdata = {'page':page, 'pagesize':pagesize, 'pagecount':0}
         with get_connection(self.dbname) as conn:
             sql = conn.select_sql(self.table, where=where)
             ret = conn.select_page(sql, page, pagesize)
             if ret.pagedata.data:
-                self._convert_data(ret.pagedata.data)
+                #self._convert_data(ret.pagedata.data)
 
-                retdata['pagenum'] = ret.pages
+                retdata['pagecount'] = ret.pages
                 retdata['data'] = ret.pagedata.data
 
         return OK, retdata

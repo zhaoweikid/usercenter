@@ -17,9 +17,11 @@ DEBUG = True
 # 日志文件配置
 LOGFILE = {'root':{'filename':'stdout', 'level':'DEBUG'}}
 
+DBNAME = 'usercenter'
+
 # 数据库配置
 DATABASE = {
-    'usercenter': {
+    DBNAME: {
         'engine':'pymysql',
         'db': 'usercenter',
         'host': '127.0.0.1',
@@ -40,5 +42,12 @@ OPENUSER_ACCOUNT = {
         'plat':'wxmicro',
     }
 }
+
+OPENSDK_SIGN_VAR = {
+    'appid': 'X-Appid',
+    'sign': 'X-Sign',
+    'method': 'X-Method',
+}
+
 
 
