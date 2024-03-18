@@ -10,6 +10,7 @@ from zbase3.utils import createid
 import logging
 import config
 from userbase import *
+from utils import check_perm, check_admin
 
 # 权限命名规则
 # xxxx 为对应功能模块名称

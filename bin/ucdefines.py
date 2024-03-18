@@ -1,5 +1,5 @@
 # coding: utf-8
-
+from zbase3.web import advance
 OK  = 0
 ERR = -1
 ERR_USER    = -2
@@ -23,6 +23,8 @@ errstr = {
     ERR_INTERNAL: '内部错误',
     ERR_SIGN: '签名错误',
 }
+
+advance.errmsg.update(errstr)
 
 
 # 未认证

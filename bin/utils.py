@@ -1,38 +1,60 @@
 # coding:utf-8
 import os, sys
-import requests
 import json
 import logging 
-import config
 
 log = logging.getLogger()
 
-def get_openid(code, appid):
-    appinfo = config.OPENUSER_ACCOUNT[appid]
-    if not appinfo:
-        log.info('not found appinfo with appid:%s', appid)
-        return None
 
-    plat = appinfo['plat']
+def perm_verify(ses, perms):
+    # 超级管理员
+    if ses.get('isadmin', 0):
+        return True
 
-    if plat == 'wx':
-        pass
-    elif plat == 'wxmicro':
-        url = 'https://api.weixin.qq.com/sns/jscode2session?appid=%s&secret=%s&js_code=%s&grant_type=authorization_code' \
-            % (appinfo['appid'], appinfo['secret'], code)
-        r = requests.get(url) 
-        obj = r.json()
-        log.debug('get openid return: %s', json.dumps(obj))
-        openid = obj.get('openid')
-        return openid
-    elif palt == 'alipay':
-        pass
+    # 普通用户检查权限
+    p = ses.get('allperm')
+    if not p:
+        return False
 
-
-def test():
-    ret = get_openid(sys.argv[1], 'wx27edcac7e40b6688')
-    print(ret)
+    allperms = set(p)
+    s = set(perms) 
+    if not s.issubset(allperms):
+        return False
+    else:
+        return True
     
-if __name__ == '__main__':
-    test()
+
+
+# 检查权限
+def check_perm(perms):
+    def f(func):
+        def _(self, *args, **kwargs):
+            # 超级管理员
+            if self.ses.get('isadmin', 0):
+                return func(self, *args, **kwargs)
+
+            # 普通用户检查权限
+            p = self.ses.get('allperm')
+            if not p:
+                return self.fail(ERR_PERM)
+            allperms = set(p)
+            s = set(perms) 
+            if not s.issubset(allperms):
+                self.fail(ERR_PERM)
+                return
+            return func(self, *args, **kwargs)
+        return _
+    return f
+
+# 检查是否管理员
+def check_admin(func):
+    def _(self, *args, **kwargs):
+        if not self.ses['isadmin']:
+            self.fail(ERR_PERM)
+            return
+        return func(self, *args, **kwargs)
+    return _
+
+
+
 

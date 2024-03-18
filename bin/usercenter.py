@@ -8,13 +8,40 @@ from zbase3.web.validator import *
 from zbase3.base.dbpool import get_connection, DBFunc
 from zbase3.utils import createid
 import logging
+import requests
 from userbase import *
 import utils
 from ucdefines import *
 import opensdk
 import config
 
+
 log = logging.getLogger()
+
+
+def get_openid(code, appid):
+    appinfo = config.OPENUSER_ACCOUNT[appid]
+    if not appinfo:
+        log.info('not found appinfo with appid:%s', appid)
+        return None
+
+    plat = appinfo['plat']
+
+    if plat == 'wx':
+        pass
+    elif plat == 'wxmicro':
+        url = 'https://api.weixin.qq.com/sns/jscode2session?appid=%s&secret=%s&js_code=%s&grant_type=authorization_code' \
+            % (appinfo['appid'], appinfo['secret'], code)
+        r = requests.get(url) 
+        obj = r.json()
+        log.debug('get openid return: %s', json.dumps(obj))
+        openid = obj.get('openid')
+        return openid
+    elif palt == 'alipay':
+        pass
+
+
+
 
 class Ping (BaseHandler):
     dbname = config.DBNAME
@@ -327,7 +354,7 @@ class UserBase (BaseHandler):
             user = conn.select_one(self.table, where, fields=fields)
             if not user:
                 return ERR_USER, 'not have user info'
-
+            # 查询用户所在的组
             groups = conn.query('select g.id as id,g.name as name from user_group ug, groups g where g.id=ug.groupid and ug.userid=%d' % userid)
             if not groups:
                 groups = []
@@ -335,8 +362,10 @@ class UserBase (BaseHandler):
 
             user['role'] = []
             user['perm'] = []
+            # 所有权限，包括从角色里展开的权限
             user['allperm'] = []
-
+            
+            # 查询用户所有的权限和角色
             userperm = conn.query('select permid,roleid from user_perm where userid=%d' % userid)
             if userperm:
                 roles = [ x['roleid'] for x in userperm if x['roleid']>0 ]
@@ -711,4 +740,11 @@ class User (UserBase):
     def error(self, data):
         self.fail(ERR_PARAM)
 
-     
+
+
+def test_openid():
+    ret = get_openid(sys.argv[1], 'wx27edcac7e40b6688')
+    print(ret)
+ 
+
+
